@@ -1,0 +1,15 @@
+{
+  "name": "@llang/compiler",
+  "exports": "./src/index.ts",
+  "lint": {
+    "rules": {
+      "exclude": [
+        "no-namespace",
+        "no-explicit-any"
+      ]
+    }
+  },
+  "fmt": {
+    "lineWidth": 100
+  }
+}
