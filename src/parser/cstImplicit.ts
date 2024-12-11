@@ -1,12 +1,11 @@
-import { CstCodeScopes } from "../cst-parse/CstCodeContext.ts";
-import { code, noImplicitNodes } from "../cst-parse/intrinsics.ts";
+import { code, codeScopes, noImplicitNodes } from "../cst-parse/intrinsics.ts";
 import { parser } from "../cst-parse/parser.ts";
 import {
   CstBlockComment,
   CstImplicit,
+  CstLineBreak,
   CstLineComment,
   CstWhitespace,
-  CstWs,
 } from "../cst/CstImplicit.ts";
 import type { Token } from "../token/Token.ts";
 import { Tokens } from "../token/TokenKind.ts";
@@ -23,19 +22,28 @@ export const cstImplicit = parser(CstImplicit, () => {
   if (token.is(Tokens.Comment)) {
     if (!token.is(Tokens.Comment.Begin)) throw new Error("unknown status");
     const kind = token.kind.kind;
-    const scope = new CstCodeScopes.Comment(kind);
+    const scope = codeScopes.comment(kind);
 
     switch (kind.type) {
       case "docBlock":
       case "block": {
-        const content: Token<Tokens.Comment.Content | Tokens.LineBreak>[] = [];
+        const content: Token<Tokens.Comment | Tokens.LineBreak>[] = [];
         while (true) {
           const next = code(scope, (c) => c.expect());
+          if (next.is(Tokens.Comment.Begin)) {
+            content.push(next);
+            continue;
+          }
           if (next.is(Tokens.Comment.End)) {
+            if (scope.depth > 0) {
+              content.push(next);
+              continue;
+            }
             return new CstBlockComment(kind, content);
           }
           if (next.is(Tokens.Comment.Content) || next.is(Tokens.LineBreak)) {
             content.push(next);
+            continue;
           }
           throw new Error(`illegal content inside block comment: ${next}`);
         }
@@ -49,6 +57,7 @@ export const cstImplicit = parser(CstImplicit, () => {
           }
           if (next.is(Tokens.Comment.Content)) {
             content.push(next);
+            continue;
           }
           throw new Error(`illegal content inside block comment: ${next}`);
         }
@@ -56,7 +65,13 @@ export const cstImplicit = parser(CstImplicit, () => {
     }
   }
   if (token.is(Tokens.Whitespace)) return new CstWhitespace(token);
-  if (token.is(Tokens.LineBreak)) return new CstWs(token);
+  if (token.is(Tokens.LineBreak)) return new CstLineBreak(token);
 
   throw new Error(`unreachable: not well-known TokenType ${token.kind}`);
 });
+
+export const cstImplicitNoLineBreak = () => {
+  const node = cstImplicit();
+  if (node instanceof CstLineBreak) return null;
+  return node;
+};

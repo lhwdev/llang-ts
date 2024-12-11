@@ -1,3 +1,3 @@
 export interface CstTree {
-  children: CstTree[];
+  readonly children: CstTree[];
 }

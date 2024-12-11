@@ -1,17 +1,18 @@
-import type { CstCodeContext, CstCodeScope } from "./CstCodeContext.ts";
+import { variableWrapper } from "../utils/variableWrapper.ts";
+import type { CstCodeContext } from "./CstCodeContext.ts";
 import type { CstNode } from "./CstNode.ts";
 import type { CstNodeInfo } from "./CstNodeInfo.ts";
 import type { CstTree } from "./CstTree.ts";
+import type { CstCodeScope, CstCodeScopes } from "./tokenizer/CstCodeScope.ts";
 
-let baseContext: CstParseContext<never> | null = null;
+type RootContext = CstParseContext<never>;
+let baseContext: RootContext | null = null;
 
-type RootContext = CstParseContext<never> & { base: CstParseContext<never> };
+export const context: RootContext = variableWrapper(() => baseContext!);
 
-export const context: RootContext = new Proxy({}, {
-  has: (_, p) => Reflect.has(baseContext!, p),
-  get: (_, p, receiver) => p === "base" ? baseContext : Reflect.get(baseContext!, p, receiver),
-  set: (_, p, newValue, receiver) => Reflect.set(baseContext!, p, newValue, receiver),
-}) as RootContext;
+export function getContext(): RootContext {
+  return baseContext!;
+}
 
 export function withContext<R>(context: CstParseContext<never>, fn: () => R): R {
   const previous = baseContext;
@@ -23,15 +24,22 @@ export function withContext<R>(context: CstParseContext<never>, fn: () => R): R 
   }
 }
 
+export type CstNodeHintType = "discardable";
+
 export interface CstParseContext<Node extends CstNode> {
   /// Code parsing
   code<R>(fn: (code: CstCodeContext) => R): R;
   code<R>(scope: CstCodeScope, fn: (code: CstCodeContext) => R): R;
 
-  noImplicitNodes(): void;
+  codeScopes: CstCodeScopes;
+  pushCodeScope(scope: CstCodeScope): void;
 
   /// Node management
   beginChild<Child extends CstNode>(info: CstNodeInfo<Child>): CstParseContext<Child>;
+
+  hintType(type: CstNodeHintType): void;
+
+  noImplicitNodes(): void;
 
   beforeEnd(node: CstNode): CstTree;
 

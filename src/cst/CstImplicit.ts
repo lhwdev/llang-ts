@@ -12,6 +12,8 @@ export class CstWs extends CstImplicit {
 
 export class CstWhitespace extends CstWs {}
 
+export class CstLineBreak extends CstWs {}
+
 export abstract class CstComment extends CstImplicit {
   abstract readonly kind: Tokens.Comments.Kind;
   abstract readonly content: Token<Tokens.Comment.Content | Tokens.LineBreak>[];

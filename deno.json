@@ -5,11 +5,15 @@
     "rules": {
       "exclude": [
         "no-namespace",
-        "no-explicit-any"
+        "no-explicit-any",
+        "no-cond-assign"
       ]
     }
   },
   "fmt": {
     "lineWidth": 100
+  },
+  "imports": {
+    "unicode-properties": "npm:unicode-properties@^1.4.1"
   }
 }
