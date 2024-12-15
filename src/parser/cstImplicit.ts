@@ -72,7 +72,6 @@ export const cstImplicitOrNull = nullableParser(CstImplicit, () => {
 });
 
 export const cstImplicitNoLineBreak = () => {
-  const node = cstImplicitOrNull();
-  if (node instanceof CstLineBreak) return null;
-  return node;
+  if (code((c) => c.peek(Tokens.LineBreak))) return null;
+  return cstImplicitOrNull();
 };

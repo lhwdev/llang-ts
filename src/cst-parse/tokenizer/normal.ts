@@ -37,7 +37,6 @@ export class NormalScope extends CstCodeScopeWithHint {
     if (token = parseStringLiteralToken(code)) return token;
 
     if (token = parseIdentifierToken(code)) return token;
-
     if (token = parseImplicitToken(code)) return token;
 
     throw new Error(`nothing matched: ${code}`);

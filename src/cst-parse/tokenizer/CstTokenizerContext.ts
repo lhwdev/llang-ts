@@ -45,4 +45,8 @@ export abstract class CstTokenizerContext {
   }
 
   abstract peek(offset?: number): CstTokenizerContext;
+
+  abstract subscribe(
+    onToken: (tokenizer: CstTokenizerContext, token: Token) => void,
+  ): CstTokenizerContext;
 }

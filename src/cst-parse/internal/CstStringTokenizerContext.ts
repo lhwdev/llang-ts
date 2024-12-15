@@ -1,14 +1,14 @@
+import { Span } from "../../token/Span.ts";
 import { Token } from "../../token/Token.ts";
 import type { TokenKind } from "../../token/TokenKind.ts";
-import { tokenKindName } from "../../utils/debug.ts";
 import { CstTokenizerContext } from "../tokenizer/CstTokenizerContext.ts";
-import { cyan, green } from "jsr:@std/fmt/colors";
 
 export class CstStringTokenizerContext extends CstTokenizerContext {
   constructor(
     readonly code: string,
     override offset: number = 0,
     readonly isPeek = false,
+    readonly onToken: ((context: CstTokenizerContext, token: Token) => void)[] = [],
   ) {
     super();
   }
@@ -39,8 +39,12 @@ export class CstStringTokenizerContext extends CstTokenizerContext {
     //   );
     // }
 
+    const token = new Token(kind, new Span(start, start + length));
+
+    this.onToken.forEach((callback) => callback(this, token));
     this.offset += length;
-    return new Token(kind, { start });
+
+    return token;
   }
 
   override ifMatch(kind: TokenKind): Token | null {
@@ -61,6 +65,15 @@ export class CstStringTokenizerContext extends CstTokenizerContext {
 
   override peek(offset: number = 0): CstTokenizerContext {
     return new CstStringTokenizerContext(this.code, this.offset + offset, true);
+  }
+
+  override subscribe(onToken: (tokenizer: CstTokenizerContext, token: Token) => void) {
+    return new CstStringTokenizerContext(
+      this.code,
+      this.offset,
+      this.isPeek,
+      [...this.onToken, onToken],
+    );
   }
 
   override toString() {

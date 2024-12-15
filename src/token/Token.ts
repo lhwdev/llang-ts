@@ -1,6 +1,8 @@
 import { tokenKindName } from "../utils/debug.ts";
 import { valueToColorString } from "../utils/format.ts";
 import { ToFormatString } from "../utils/format.ts";
+import type { Span } from "./Span.ts";
+import { GetSpanSymbol, type Spanned } from "./Spanned.ts";
 import { TokenKind } from "./TokenKind.ts";
 import * as colors from "@std/fmt/colors";
 
@@ -14,7 +16,7 @@ import * as colors from "@std/fmt/colors";
  * 2. Token should be able to contain information such as {@link span}, error,
  *    etc.
  */
-export class Token<Kind extends TokenKind = TokenKind> {
+export class Token<Kind extends TokenKind = TokenKind> implements Spanned {
   constructor(
     readonly kind: Kind,
     readonly span: Span,
@@ -25,6 +27,10 @@ export class Token<Kind extends TokenKind = TokenKind> {
       return this.kind === type as any;
     }
     return this.kind instanceof type;
+  }
+
+  get [GetSpanSymbol](): Span {
+    return this.span;
   }
 
   toString() {
@@ -39,8 +45,4 @@ export class Token<Kind extends TokenKind = TokenKind> {
       `${colors.yellow((this.span.start + this.kind.code.length).toString())}]` +
       ` ${valueToColorString(this.kind.code)}`;
   }
-}
-
-export interface Span {
-  start: number;
 }

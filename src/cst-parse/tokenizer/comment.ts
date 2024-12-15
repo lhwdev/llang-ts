@@ -21,15 +21,17 @@ export class CommentScope extends CstCodeScope {
       this.depth++;
       return token;
     }
-    if (this.depth == 1) {
-      if (this.kind.end && (token = code.ifMatch(this.kind.end))) {
-        this.depth--;
-        return token;
-      }
-    } else {
-      if (token = code.ifMatch(Tokens.Comments.Block.End)) {
-        this.depth--;
-        return token;
+    if (this.kind.end) {
+      if (this.depth == 1) {
+        if (token = code.ifMatch(this.kind.end)) {
+          this.depth--;
+          return token;
+        }
+      } else {
+        if (token = code.ifMatch(Tokens.Comments.Block.End)) {
+          this.depth--;
+          return token;
+        }
       }
     }
     if (token = parseLineBreakToken(code)) {

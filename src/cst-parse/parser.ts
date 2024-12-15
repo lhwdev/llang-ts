@@ -43,7 +43,7 @@ export function nullableParser<Params extends any[], Node extends CstNode>(
       if (node) {
         return child.end(node);
       } else {
-        return child.endWithError(node);
+        return child.endWithError(null);
       }
     } catch (e) {
       const result = child.endWithError(e);

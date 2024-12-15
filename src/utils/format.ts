@@ -1,6 +1,21 @@
-import { brightBlack, brightWhite, green, magenta, stripAnsiCode, yellow } from "@std/fmt/colors";
+import {
+  bold,
+  brightWhite,
+  dim,
+  gray,
+  green,
+  italic,
+  magenta,
+  stripAnsiCode,
+  yellow,
+} from "@std/fmt/colors";
+
+export function format(value: any, options?: Options): string {
+  return valueToColorString(value, options);
+}
 
 export const ToFormatString = Symbol("ToFormatString");
+export const FormatObjectEntries = Symbol("FormatObjectEntries");
 export const MaxWidth = 80;
 export const Indent = "  ";
 
@@ -11,6 +26,7 @@ let SkipTrailing = false;
 let Options = {
   oneLine: false,
   handleObject: (value: object): Entry => objectToStringEntry(value),
+  important: (_value: object): boolean => true,
 };
 
 type Options = Partial<typeof Options>;
@@ -18,8 +34,10 @@ type Options = Partial<typeof Options>;
 const TooLongError = {};
 
 class OneLineOutput {
-  result = "";
-  length = 0;
+  constructor(
+    public result = "",
+    public length = 0,
+  ) {}
 
   print(str: string) {
     this.result += str;
@@ -28,22 +46,46 @@ class OneLineOutput {
     this.length = length;
     if (!Options.oneLine && length > MaxWidth) throw TooLongError;
   }
+
+  forkChild() {
+    return new OneLineOutput("", 0);
+  }
+
+  pushFork(child: OneLineOutput) {
+    this.print(child.result);
+  }
 }
 
 class MultiLineOutput {
-  result: string[] = [""];
-  last: boolean | null = false;
+  constructor(
+    public result: string = "",
+    public last: boolean | null = false,
+  ) {}
 
   print(line: string, [left, right]: [boolean | null, boolean | null] = [null, null]) {
     const newLine = this.last || left;
-    const depth = ObjectStack.length;
 
-    if (newLine) this.result.push("  ".repeat(depth));
+    if (newLine) {
+      const depth = ObjectStack.length;
+      this.result += "\n" + "  ".repeat(depth);
+    }
 
-    const lastIndex = this.result.length - 1;
-    this.result[lastIndex] = this.result[lastIndex] + line;
+    this.result += line;
 
     this.last = right;
+  }
+
+  forkChild() {
+    return new MultiLineOutput("", this.last);
+  }
+
+  pushFork(from: MultiLineOutput) {
+    this.result += from.result;
+    this.last = from.last;
+  }
+
+  push(from: MultiLineOutput) {
+    this.print(from.result);
   }
 }
 
@@ -55,7 +97,7 @@ abstract class Entry {
 class GroupEntry extends Entry {
   constructor(
     readonly left: [string, spacing: boolean],
-    readonly item: Entry,
+    readonly item: ObjectEntry,
     readonly right: [string, spacing: boolean],
   ) {
     super();
@@ -64,16 +106,26 @@ class GroupEntry extends Entry {
   override oneLine(output: OneLineOutput) {
     const [left, leftSpacing] = this.left;
     const [right, rightSpacing] = this.right;
-    output.print(left);
+    output.print(gray(left));
     if (leftSpacing) output.print(" ");
     this.item.oneLine(output);
     if (rightSpacing) output.print(" ");
-    output.print(right);
+    output.print(gray(right));
   }
+
   override multiLine(output: MultiLineOutput): void {
-    output.print(this.left[0], [false, true]);
-    this.item.multiLine(output);
-    output.print(this.right[0], [true, false]);
+    const oneLine = new OneLineOutput();
+    oneLine.length += output.result.length - output.result.lastIndexOf("\n");
+    try {
+      this.oneLine(oneLine);
+      output.print(oneLine.result);
+    } catch (e) {
+      if (e !== TooLongError) throw e;
+
+      output.print(gray(this.left[0]), [false, true]);
+      this.item.multiLine(output);
+      output.print(gray(this.right[0]), [true, false]);
+    }
   }
 }
 
@@ -115,9 +167,9 @@ class ListEntry extends Entry {
       previous = right;
     }
   }
+
   override multiLine(output: MultiLineOutput): void {
     for (const prop of this.props) prop.entry.multiLine(output);
-    return;
   }
 }
 
@@ -161,26 +213,18 @@ class ObjectEntry extends Entry {
       ObjectStack.pop();
     }
   }
-  override multiLine(output: MultiLineOutput): void {
-    const oneLine = new OneLineOutput();
-    oneLine.length += output.result[output.result.length - 1].length;
-    try {
-      this.oneLine(oneLine);
-      output.print(oneLine.result);
-    } catch (e) {
-      if (e !== TooLongError) throw e;
 
-      ObjectStack.push(this.value);
-      try {
-        let isFirst = true;
-        for (const prop of this.props) {
-          if (!isFirst) output.last = true;
-          prop.entry.multiLine(output);
-          isFirst = false;
-        }
-      } finally {
-        ObjectStack.pop();
+  override multiLine(output: MultiLineOutput): void {
+    ObjectStack.push(this.value);
+    try {
+      let isFirst = true;
+      for (const prop of this.props) {
+        if (!isFirst) output.last = true;
+        prop.entry.multiLine(output);
+        isFirst = false;
       }
+    } finally {
+      ObjectStack.pop();
     }
   }
 }
@@ -195,12 +239,33 @@ class TrailingEntry extends ValueEntry {
   }
 }
 
+class StyleEntry extends Entry {
+  constructor(readonly style: (str: string) => string, readonly entry: Entry) {
+    super();
+  }
+
+  override oneLine(output: OneLineOutput) {
+    const child = output.forkChild();
+    this.entry.oneLine(child);
+    child.result = this.style(child.result);
+    output.pushFork(child);
+  }
+
+  override multiLine(output: MultiLineOutput) {
+    const child = output.forkChild();
+    this.entry.multiLine(child);
+    child.result = this.style(child.result);
+    output.pushFork(child);
+  }
+}
+
 export const FormatEntries = {
   value: ValueEntry,
   group: GroupEntry,
   list: ListEntry,
   object: ObjectEntry,
   trailing: TrailingEntry,
+  style: StyleEntry,
 };
 
 export type FormatEntry = Entry;
@@ -209,7 +274,7 @@ export function valueToColorString(
   value: any,
   options?: Options,
 ): string {
-  return format(options, () => valueToColorStringEntry(value));
+  return formatFn(options, () => valueToColorStringEntry(value));
 }
 
 export function valueToColorStringEntry(
@@ -223,7 +288,7 @@ export function valueToColorStringEntry(
       v = yellow(value.toString());
       break;
     case "string":
-      v = `${brightBlack("'")}${green(JSON.stringify(value).slice(1, -1))}${brightBlack("'")}`;
+      v = green(`${dim("'")}${JSON.stringify(value).slice(1, -1)}${dim("'")}`);
       break;
     case "symbol":
       v = magenta(value.toString());
@@ -231,9 +296,9 @@ export function valueToColorStringEntry(
     case "undefined":
     case "object":
       if (!value) {
-        v = magenta(value === null ? "null" : "undefined");
+        v = gray(value === null ? "null" : "undefined");
       } else if (ObjectStack.includes(value)) {
-        v = "[recurse]";
+        v = italic("[recurse]");
       } else {
         let result;
         if (ToFormatString in value) {
@@ -265,7 +330,7 @@ export function classPropertiesToString(
   data: object,
   options?: Options,
 ): string {
-  return format(options, () => classPropertiesToStringEntry(data));
+  return formatFn(options, () => classPropertiesToStringEntry(data));
 }
 
 export function classPropertiesToStringEntry(
@@ -278,33 +343,72 @@ export function classPropertiesToStringEntry(
   );
 }
 
+export function classToString(
+  data: object,
+  options?: Options,
+): string {
+  return formatFn(options, () => classPropertiesToStringEntry(data));
+}
+
+export function classToStringEntry(
+  data: object,
+): Entry {
+  const list = new ListEntry();
+  const name = data.constructor?.name ?? "Object";
+  if (name == "Object") {
+    return objectToStringEntry(data);
+  }
+  list.push(new ValueEntry(bold(name)));
+  const obj = objectToStringEntry(
+    data,
+    " = ",
+    (entry) => new GroupEntry(["(", false], entry, [")", false]),
+  );
+  list.push(obj);
+  return list;
+}
+
 export function objectToString(
   data: object,
   options?: Options,
 ): string {
-  return format(options, () => objectToStringEntry(data));
+  return formatFn(options, () => objectToStringEntry(data));
 }
 
 export function objectToStringEntry(
   data: object,
   between: string = ": ",
-  newGroup: (entry: Entry) => Entry = (entry) => new GroupEntry(["{", true], entry, ["}", true]),
+  newGroup: (entry: ObjectEntry) => Entry = (entry) =>
+    new GroupEntry(["{", true], entry, ["}", true]),
+  mapItem?: (key: string, value: any, item: ListEntry) => Entry,
 ): Entry {
   if (Array.isArray(data)) return arrayToStringEntry(data);
   const result = new ObjectEntry(data);
   ObjectStack.push(data);
+
   try {
-    for (const [key, value] of Object.entries(data)) {
+    const important = Options.important(data);
+    for (const [key, value] of formatEntries(data)) {
       const item = new ListEntry(false);
-      item.push(new ValueEntry(`${brightWhite(key)}${between}`), [true, false]);
+      item.push(new ValueEntry(`${important ? brightWhite(key) : key}${dim(between)}`), [
+        true,
+        false,
+      ]);
       item.push(valueToColorStringEntry(value), [false, false]);
       item.push(new TrailingEntry(","), [false, true]);
-      result.push(item);
+      result.push(mapItem ? mapItem(key, value, item) : item);
     }
   } finally {
     ObjectStack.pop();
   }
   return newGroup(result);
+}
+
+export function formatEntries(data: object): readonly [any, any][] {
+  if (FormatObjectEntries in data) {
+    return data[FormatObjectEntries] as any;
+  }
+  return Object.entries(data);
 }
 
 export function arrayToStringEntry(
@@ -315,7 +419,7 @@ export function arrayToStringEntry(
     for (const value of Object.values(data)) {
       const item = new ListEntry(false);
       item.push(valueToColorStringEntry(value), [true, false]);
-      item.push(new TrailingEntry(","), [false, true]);
+      item.push(new TrailingEntry(dim(",")), [false, true]);
       result.push(item);
     }
   } finally {
@@ -324,7 +428,17 @@ export function arrayToStringEntry(
   return new GroupEntry(["[", false], result, ["]", false]);
 }
 
-export function format(options: Options | undefined, fn: () => Entry): string {
+export function formatRaw(options: Options | undefined | null, fn: () => Entry): Entry {
+  const previous = Options;
+  Options = options ? { ...previous, ...options } : previous;
+  try {
+    return fn();
+  } finally {
+    Options = previous;
+  }
+}
+
+export function formatFn(options: Options | undefined | null, fn: () => Entry): string {
   const previous = Options;
   Options = options ? { ...previous, ...options } : previous;
   try {
@@ -338,7 +452,7 @@ export function format(options: Options | undefined, fn: () => Entry): string {
       if (e !== TooLongError) throw e;
       const output = new MultiLineOutput();
       entry.multiLine(output);
-      r = output.result.join("\n");
+      r = output.result;
     }
     return r;
   } finally {

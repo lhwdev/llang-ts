@@ -127,7 +127,6 @@ export namespace Tokens {
       };
 
       export const Begin = new Comment.Begin(Kind, "//");
-      export const End = new Comment.End(Kind, "");
       export class Content extends Comment.Content {
         constructor(code: string) {
           super(Kind, code);

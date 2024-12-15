@@ -1,4 +1,3 @@
-import { CstRootNode } from "../../cst/CstRootNode.ts";
 import { cstImplicitOrNull } from "../../parser/cstImplicit.ts";
 import type { CstCodeContext } from "../CstCodeContext.ts";
 import type { CstNode } from "../CstNode.ts";
@@ -14,47 +13,65 @@ import type { CstTokenizerContext } from "../tokenizer/CstTokenizerContext.ts";
 import type { CstCodeScope, CstCodeScopes } from "../tokenizer/CstCodeScope.ts";
 import { CodeScopesImpl } from "../tokenizer/scopes.ts";
 import { CstCodeContextImpl } from "./CstCodeContextImpl.ts";
-import { CstGroup } from "./CstGroup.ts";
+import { CstIntermediateGroup, CstRootGroup } from "./CstGroup.ts";
+import { format } from "../../utils/format.ts";
+import { dim } from "@std/fmt/colors";
 
 export class CstParseContextImpl<Node extends CstNode> implements CstParseContext<Node> {
   constructor(
-    readonly tokenizer: CstTokenizerContext,
+    tokenizer: CstTokenizerContext,
   ) {
+    tokenizer = tokenizer.subscribe((_, token) => {
+      this.current.reportToken(token);
+    });
+    this.tokenizer = tokenizer;
     this.c = new CstCodeContextImpl(tokenizer);
 
     this.codeScopes = new CodeScopesImpl(tokenizer);
     this.normalScope = this.codeScopes.normal();
+    this.c.scope = this.normalScope;
 
-    const root = new CstGroup({} as any, CstRootNode, tokenizer.offset, []);
-    (root as any).parent = root;
+    const root = new CstRootGroup();
     this.groups = [root];
   }
 
+  readonly tokenizer: CstTokenizerContext;
   readonly c: CstCodeContextImpl;
 
   codeScopes: CstCodeScopes;
   private normalScope;
+
+  private debugC(line: string) {
+    console.log(dim("CstParseContextImpl: " + line));
+  }
 
   /// Code parsing
   code<R>(fn: (code: CstCodeContext) => R): R;
   code<R>(scope: CstCodeScope, fn: (code: CstCodeContext) => R): R;
 
   code<R>(a: CstCodeScope | ((code: CstCodeContext) => R), b?: (code: CstCodeContext) => R): R {
-    let scope;
+    const current = this.current;
+    let scope = current.startCode();
     let fn;
     if (typeof a === "function") {
-      scope = this.current.codeScope ?? this.normalScope;
       fn = a;
     } else {
       scope = a;
       fn = b!;
     }
-    this.c.scope = scope;
+    if (scope) {
+      this.c.scope = scope;
+    }
+
     try {
       const result = fn(this.c);
+      if (result) {
+        this.debugC(`code(${fn}) -> ${format(result)}`);
+      }
       return result;
     } finally {
-      this.current.extendSpan(this.tokenizer.offset);
+      current.endCode();
+      this.c.scope = this.normalScope;
     }
   }
 
@@ -63,7 +80,7 @@ export class CstParseContextImpl<Node extends CstNode> implements CstParseContex
   }
 
   /// Node management
-  readonly groups: CstGroup[];
+  readonly groups: CstIntermediateGroup[];
 
   get current() {
     return this.groups.at(-1)!;
@@ -81,7 +98,7 @@ export class CstParseContextImpl<Node extends CstNode> implements CstParseContex
       this.withSelf(() => cstImplicitOrNull());
     }
 
-    const child = new CstGroup(parent, info, this.tokenizer.offset, []);
+    const child = new CstIntermediateGroup(parent, info, this.tokenizer.offset);
     this.groups.push(child);
     return this as any;
   }
@@ -95,21 +112,17 @@ export class CstParseContextImpl<Node extends CstNode> implements CstParseContex
   }
 
   beforeEnd(node: CstNode): CstTree {
-    this.current.node = node;
-    return this.current;
+    const current = this.current;
+    current.node = node;
+    return current.beforeEnd(node);
   }
 
   end(node: Node): Node {
     const child = this.groups.pop()!;
-    child.node = node;
+    const group = child.ensureEnd(node);
 
     const parent = this.current;
-    parent.children.push(child);
-    parent.extendSpan(child.spanTo);
-
-    if (child.spanFrom != child.spanTo) {
-      parent.allowImplicit = true;
-    }
+    parent.addChild(group);
 
     // if (this.groups.length === 1) console.log(node);
 

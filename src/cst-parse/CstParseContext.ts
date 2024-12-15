@@ -1,3 +1,4 @@
+import type { Token } from "../token/Token.ts";
 import { variableWrapper } from "../utils/variableWrapper.ts";
 import type { CstCodeContext } from "./CstCodeContext.ts";
 import type { CstNode } from "./CstNode.ts";
@@ -28,7 +29,7 @@ export type CstNodeHintType = "discardable";
 
 export interface CstParseContext<Node extends CstNode> {
   /// Code parsing
-  code<R>(fn: (code: CstCodeContext) => R): R;
+  code<R extends Token>(fn: (code: CstCodeContext) => R): R;
   code<R>(scope: CstCodeScope, fn: (code: CstCodeContext) => R): R;
 
   codeScopes: CstCodeScopes;
