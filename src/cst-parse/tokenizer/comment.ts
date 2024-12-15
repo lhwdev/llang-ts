@@ -22,7 +22,7 @@ export class CommentScope extends CstCodeScope {
       return token;
     }
     if (this.depth == 1) {
-      if (token = code.ifMatch(this.kind.end)) {
+      if (this.kind.end && (token = code.ifMatch(this.kind.end))) {
         this.depth--;
         return token;
       }
@@ -66,8 +66,8 @@ export class CommentScope extends CstCodeScope {
     return code.create(this.kind.text, offset);
   }
 
-  override nextAny(): [Token] {
-    return [this.match(this.code)];
+  override nextAny(): Token {
+    return this.match(this.code);
   }
 
   override peek(): this {

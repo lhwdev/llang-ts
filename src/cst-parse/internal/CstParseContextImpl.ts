@@ -1,5 +1,5 @@
 import { CstRootNode } from "../../cst/CstRootNode.ts";
-import { cstImplicit } from "../../parser/cstImplicit.ts";
+import { cstImplicitOrNull } from "../../parser/cstImplicit.ts";
 import type { CstCodeContext } from "../CstCodeContext.ts";
 import type { CstNode } from "../CstNode.ts";
 import type { CstNodeInfo } from "../CstNodeInfo.ts";
@@ -22,7 +22,7 @@ export class CstParseContextImpl<Node extends CstNode> implements CstParseContex
   ) {
     this.c = new CstCodeContextImpl(tokenizer);
 
-    this.codeScopes = new CodeScopesImpl(this.tokenizer);
+    this.codeScopes = new CodeScopesImpl(tokenizer);
     this.normalScope = this.codeScopes.normal();
 
     const root = new CstGroup({} as any, CstRootNode, tokenizer.offset, []);
@@ -51,7 +51,8 @@ export class CstParseContextImpl<Node extends CstNode> implements CstParseContex
     }
     this.c.scope = scope;
     try {
-      return fn(this.c);
+      const result = fn(this.c);
+      return result;
     } finally {
       this.current.extendSpan(this.tokenizer.offset);
     }
@@ -77,7 +78,7 @@ export class CstParseContextImpl<Node extends CstNode> implements CstParseContex
     const parent = this.current;
     if (!parent.disableImplicit && parent.allowImplicit) {
       parent.allowImplicit = false;
-      this.withSelf(() => cstImplicit());
+      this.withSelf(() => cstImplicitOrNull());
     }
 
     const child = new CstGroup(parent, info, this.tokenizer.offset, []);
@@ -103,16 +104,19 @@ export class CstParseContextImpl<Node extends CstNode> implements CstParseContex
     child.node = node;
 
     const parent = this.current;
+    parent.children.push(child);
     parent.extendSpan(child.spanTo);
 
     if (child.spanFrom != child.spanTo) {
       parent.allowImplicit = true;
     }
 
+    // if (this.groups.length === 1) console.log(node);
+
     return node;
   }
 
-  endWithError(error: unknown): Node | null {
+  endWithError(error: unknown | null): Node | null {
     const child = this.groups.pop()!;
     return child.endWithError(error);
   }

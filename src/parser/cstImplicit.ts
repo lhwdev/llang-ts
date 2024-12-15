@@ -1,5 +1,5 @@
 import { code, codeScopes, noImplicitNodes } from "../cst-parse/intrinsics.ts";
-import { parser } from "../cst-parse/parser.ts";
+import { nullableParser, parser } from "../cst-parse/parser.ts";
 import {
   CstBlockComment,
   CstImplicit,
@@ -15,10 +15,11 @@ export const cstWhitespace = parser(CstWhitespace, () => {
   return new CstWhitespace(token);
 });
 
-export const cstImplicit = parser(CstImplicit, () => {
+export const cstImplicitOrNull = nullableParser(CstImplicit, () => {
   noImplicitNodes();
 
-  const token = code((c) => c.expect(Tokens.Implicit));
+  const token = code((c) => c.next(Tokens.Implicit));
+  if (!token) return null;
   if (token.is(Tokens.Comment)) {
     if (!token.is(Tokens.Comment.Begin)) throw new Error("unknown status");
     const kind = token.kind.kind;
@@ -29,7 +30,7 @@ export const cstImplicit = parser(CstImplicit, () => {
       case "block": {
         const content: Token<Tokens.Comment | Tokens.LineBreak>[] = [];
         while (true) {
-          const next = code(scope, (c) => c.expect());
+          const next = code(scope, (c) => c.next());
           if (next.is(Tokens.Comment.Begin)) {
             content.push(next);
             continue;
@@ -51,7 +52,7 @@ export const cstImplicit = parser(CstImplicit, () => {
       case "line": {
         const content: Token<Tokens.Comments.Line.Content>[] = [];
         while (true) {
-          const next = code(scope, (c) => c.expect());
+          const next = code(scope, (c) => c.next());
           if (next.is(Tokens.LineBreak)) {
             return new CstLineComment(content);
           }
@@ -59,7 +60,7 @@ export const cstImplicit = parser(CstImplicit, () => {
             content.push(next);
             continue;
           }
-          throw new Error(`illegal content inside block comment: ${next}`);
+          throw new Error(`illegal content inside line comment: ${next}`);
         }
       }
     }
@@ -71,7 +72,7 @@ export const cstImplicit = parser(CstImplicit, () => {
 });
 
 export const cstImplicitNoLineBreak = () => {
-  const node = cstImplicit();
+  const node = cstImplicitOrNull();
   if (node instanceof CstLineBreak) return null;
   return node;
 };

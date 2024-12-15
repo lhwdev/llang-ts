@@ -1,50 +1,49 @@
 import type { Token } from "../../token/Token.ts";
 import { Tokens } from "../../token/TokenKind.ts";
-import { CstCodeScope } from "./CstCodeScope.ts";
+import type { TokenKinds } from "../../token/TokenKinds.ts";
+import { isInherited } from "../../utils/extends.ts";
+import { CstCodeScopeWithHint } from "./CstCodeScopeWithHint.ts";
 import type { CstTokenizerContext } from "./CstTokenizerContext.ts";
+import { parseIdentifierToken } from "./identifier.ts";
+import { parseImplicitToken } from "./implicit.ts";
+import { parseLineBreakToken } from "./lineBreak.ts";
+import {
+  parseBooleanLiteralToken,
+  parseNumberLiteralToken,
+  parseStringLiteralToken,
+} from "./literal.ts";
+import { parseKeywordToken, parseSoftKeywordToken } from "./modifier.ts";
+import { parseOperatorToken } from "./operator.ts";
 
-export class NormalScope extends CstCodeScope {
-  depth = 1;
-  private nextCache: Token | null = null;
-
+export class NormalScope extends CstCodeScopeWithHint {
   constructor(code: CstTokenizerContext) {
     super(code);
   }
 
-  // deno-lint-ignore no-unused-vars
-  protected unmatchedDelimiter(code: CstTokenizerContext, kind: Tokens.Delimiter.Right): Token {
-    throw new Error("!!!");
-  }
-
-  private matchSpecial(code: CstTokenizerContext): Token | null {
+  override match(code: CstTokenizerContext, hint: TokenKinds): Token {
     let token;
-    if (token = code.ifMatch(Tokens.Comments.Block.Begin)) {
-      this.depth++;
-      return token;
+
+    if (token = parseLineBreakToken(code)) return token;
+
+    if (token = parseKeywordToken(code)) return token;
+    if (isInherited(hint, Tokens.SoftKeyword)) {
+      if (token = parseSoftKeywordToken(code)) return token;
     }
 
-    return null;
-  }
+    if (token = parseOperatorToken(code)) return token;
 
-  private match(code: CstTokenizerContext): Token {
-    let token;
-    if (token = this.nextCache) {
-      this.nextCache = null;
-      return token;
-    }
-    if (token = this.matchSpecial(code)) {
-      this.depth++;
-      return token;
-    }
-  }
+    if (token = parseNumberLiteralToken(code)) return token;
+    if (token = parseBooleanLiteralToken(code)) return token;
+    if (token = parseStringLiteralToken(code)) return token;
 
-  override nextAny(): [Token] {
-    return [this.match(this.code)];
+    if (token = parseIdentifierToken(code)) return token;
+
+    if (token = parseImplicitToken(code)) return token;
+
+    throw new Error(`nothing matched: ${code}`);
   }
 
   override peek(): this {
-    const scope = new NormalScope(this.code.peek());
-    scope.depth = this.depth;
-    return scope as this;
+    return new NormalScope(this.code.peek()) as this;
   }
 }

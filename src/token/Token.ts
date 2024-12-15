@@ -1,4 +1,8 @@
+import { tokenKindName } from "../utils/debug.ts";
+import { valueToColorString } from "../utils/format.ts";
+import { ToFormatString } from "../utils/format.ts";
 import { TokenKind } from "./TokenKind.ts";
+import * as colors from "@std/fmt/colors";
 
 /**
  * Why need a `Token`, when {@link TokenKind} already contains code? The reason
@@ -21,6 +25,19 @@ export class Token<Kind extends TokenKind = TokenKind> {
       return this.kind === type as any;
     }
     return this.kind instanceof type;
+  }
+
+  toString() {
+    return `Token(kind=${tokenKindName(this.kind)},` +
+      `span=[${this.span.start}, ${this.span.start + this.kind.code.length}],` +
+      ` code='${this.kind.code}')`;
+  }
+
+  [ToFormatString]() {
+    return `${colors.brightBlue(tokenKindName(this.kind))}` +
+      `[${colors.yellow(this.span.start.toString())}, ` +
+      `${colors.yellow((this.span.start + this.kind.code.length).toString())}]` +
+      ` ${valueToColorString(this.kind.code)}`;
   }
 }
 

@@ -1,20 +1,24 @@
 import type { Token } from "../../token/Token.ts";
 import { Tokens } from "../../token/TokenKind.ts";
+import { parseIdentifierLike } from "./common.ts";
 import { CstCodeScope } from "./CstCodeScope.ts";
 import type { CstTokenizerContext } from "./CstTokenizerContext.ts";
 import { parseLineBreakToken } from "./lineBreak.ts";
-import { NormalScope } from "./normal.ts";
 
 const digits = "0123456789_";
 const specialDigitLimiters = "xb";
 
-export function parseNumberLiteral(code: CstTokenizerContext): Token<Tokens.Literal.Number> | null {
+export function parseNumberLiteralToken(
+  code: CstTokenizerContext,
+): Token<Tokens.Literal.Number> | null {
   if (!"0123456789".includes(code.current)) return null;
 
   let offset = 1;
   let limiter;
 
-  if (!specialDigitLimiters.includes(limiter = code.get(offset))) {
+  if (specialDigitLimiters.includes(limiter = code.get(offset))) {
+    offset++;
+  } else {
     limiter = null;
   }
 
@@ -58,6 +62,26 @@ export function parseNumberLiteral(code: CstTokenizerContext): Token<Tokens.Lite
     }
   }
   return code.create(Tokens.Literal.Number, offset);
+}
+
+export function parseBooleanLiteralToken(
+  code: CstTokenizerContext,
+): Token<Tokens.Literal.Boolean> | null {
+  const text = parseIdentifierLike(code);
+  if (!text) return null;
+
+  if (text === "true") return code.match(Tokens.Literal.Boolean.True);
+  if (text === "false") return code.match(Tokens.Literal.Boolean.False);
+
+  return null;
+}
+export function parseStringLiteralToken(
+  code: CstTokenizerContext,
+): Token<Tokens.Literal.String.Left> | null {
+  let token;
+  if (token = code.ifMatch(Tokens.Literal.String.Kind.OneLine.left)) return token;
+  if (token = code.ifMatch(Tokens.Literal.String.Kind.MultiLine.left)) return token;
+  return null;
 }
 
 export class StringLiteralScope extends CstCodeScope {
@@ -112,35 +136,11 @@ export class StringLiteralScope extends CstCodeScope {
     return code.create(Tokens.Literal.String.Text, offset);
   }
 
-  override nextAny(): [Token] {
-    return [this.match(this.code)];
+  override nextAny(): Token {
+    return this.match(this.code);
   }
 
   override peek(): this {
     return new StringLiteralScope(this.kind, this.code) as this;
-  }
-}
-
-export class StringLiteralExprScope extends NormalScope {
-  constructor(
-    readonly kind: Tokens.Literal.String.Kind,
-    ...args: ConstructorParameters<typeof NormalScope>
-  ) {
-    super(...args);
-  }
-
-  protected override unmatchedDelimiter(
-    code: CstTokenizerContext,
-    kind: Tokens.Delimiter.Right,
-  ): Token {
-    let token;
-    if (token = code.ifMatch(this.kind.right)) {
-      return token;
-    }
-    return super.unmatchedDelimiter(code, kind);
-  }
-
-  override peek(): this {
-    return new StringLiteralExprScope(this.kind, this.code.peek()) as this;
   }
 }

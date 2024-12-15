@@ -15,9 +15,10 @@ type TypeMarker = never;
 
 export namespace Tokens {
   /// Eof: end of file
-  export class Eof extends TokenKind {
+  class _Eof extends TokenKind {
     $eof?: TypeMarker;
   }
+  export const Eof = new _Eof("");
 
   /// Implicit Nodes (ignored)
   export class Implicit extends TokenKind {
@@ -51,7 +52,7 @@ export namespace Tokens {
       type: "docBlock" | "block" | "line";
 
       readonly begin: Comment.Begin;
-      readonly end: Comment.End;
+      readonly end: Comment.End | null;
       readonly text: new (code: string) => Comment.Content;
     }
 
@@ -102,8 +103,8 @@ export namespace Tokens {
         },
       };
 
-      export const Begin = new Comment.Begin(Kind, "//");
-      export const End = new Comment.End(Kind, "");
+      export const Begin = new Comment.Begin(Kind, "/*");
+      export const End = new Comment.End(Kind, "*/");
       export class Content extends Comment.Content {
         constructor(code: string) {
           super(Kind, code);
@@ -118,15 +119,15 @@ export namespace Tokens {
           return Begin;
         },
         get end() {
-          return End;
+          return null;
         },
         get text() {
           return Content;
         },
       };
 
-      export const Begin = new Comment.Begin(Kind, "/*");
-      export const End = new Comment.End(Kind, "*/");
+      export const Begin = new Comment.Begin(Kind, "//");
+      export const End = new Comment.End(Kind, "");
       export class Content extends Comment.Content {
         constructor(code: string) {
           super(Kind, code);
@@ -252,6 +253,9 @@ export namespace Tokens {
       export class Decimal extends Literal {}
     }
 
-    export class Boolean extends Literal {}
+    export class Boolean extends Literal {
+      static True = new Boolean("true");
+      static False = new Boolean("false");
+    }
   }
 }

@@ -12,6 +12,6 @@ export class CodeScopesImpl implements CstCodeScopes {
   }
 
   comment(kind: Tokens.Comments.Kind) {
-    return new CommentScope(this.code, kind);
+    return new CommentScope(kind, this.code);
   }
 }

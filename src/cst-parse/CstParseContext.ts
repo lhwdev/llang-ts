@@ -45,5 +45,5 @@ export interface CstParseContext<Node extends CstNode> {
 
   end(node: Node): Node;
 
-  endWithError(error: unknown): Node | null;
+  endWithError(error: unknown | null): Node | null;
 }

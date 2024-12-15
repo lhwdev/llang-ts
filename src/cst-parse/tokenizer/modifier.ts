@@ -1,17 +1,9 @@
 import type { Token } from "../../token/Token.ts";
 import { Tokens } from "../../token/TokenKind.ts";
 import type { CstTokenizerContext } from "./CstTokenizerContext.ts";
+import { parseIdentifierLike } from "./common.ts";
 
-const isWord = /\w/;
-
-function parseIdentifierLike(code: CstTokenizerContext): string | null {
-  if (!isWord.test(code.current)) return null;
-  let offset = 1;
-  for (; offset < code.remaining; offset++) {
-    if (!isWord.test(code.current)) break;
-  }
-  return code.span(offset);
-}
+export const isWord = /\w/;
 
 export function parseKeywordToken(code: CstTokenizerContext): Token<Tokens.Keyword> | null {
   const text = parseIdentifierLike(code);
