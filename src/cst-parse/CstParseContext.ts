@@ -1,9 +1,9 @@
 import type { Token } from "../token/Token.ts";
 import { variableWrapper } from "../utils/variableWrapper.ts";
 import type { CstCodeContext } from "./CstCodeContext.ts";
-import type { CstNode } from "./CstNode.ts";
-import type { CstNodeInfo } from "./CstNodeInfo.ts";
-import type { CstTree } from "./CstTree.ts";
+import type { CstNode } from "../cst/CstNode.ts";
+import type { CstNodeInfo } from "../cst/CstNodeInfo.ts";
+import type { CstTree } from "../cst/CstTree.ts";
 import type { CstCodeScope, CstCodeScopes } from "./tokenizer/CstCodeScope.ts";
 
 type RootContext = CstParseContext<never>;

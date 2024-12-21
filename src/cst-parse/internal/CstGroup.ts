@@ -1,11 +1,12 @@
+import type { CstNode } from "../../cst/CstNode.ts";
+import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
 import { CstRootNode } from "../../cst/CstRootNode.ts";
+import { CstTree } from "../../cst/CstTree.ts";
 import { Span } from "../../token/Span.ts";
 import { GetSpanSymbol, type Spanned } from "../../token/Spanned.ts";
 import type { Token } from "../../token/Token.ts";
-import type { CstNode } from "../CstNode.ts";
-import type { CstNodeInfo } from "../CstNodeInfo.ts";
+import { fmt } from "../../utils/format.ts";
 import type { CstNodeHintType } from "../CstParseContext.ts";
-import { CstTree } from "../CstTree.ts";
 import type { CstCodeScope } from "../tokenizer/CstCodeScope.ts";
 
 export class CstIntermediateGroup {
@@ -39,9 +40,15 @@ export class CstIntermediateGroup {
 
   private codeSession?: { start: number };
 
-  protected extendSpan(end: number) {
-    if (end < this.spanEnd) throw new Error("why span decreased");
-    this.spanEnd = end;
+  protected extendSpan(span: Span, debugHint?: any) {
+    if (this.spanEnd !== span.start) {
+      throw new Error(
+        fmt`span not continuous: previous=${this.spanStart} to ${this.spanEnd}, current=${
+          debugHint ?? span
+        }`,
+      );
+    }
+    this.spanEnd = span.end;
   }
 
   startCode(): CstCodeScope | null {
@@ -55,6 +62,11 @@ export class CstIntermediateGroup {
   reportToken(token: Token) {
     if (!this.codeSession) {
       throw new Error("internal error: CstTokenizerContext used outside code()");
+    }
+    if (this.tokens.at(-1)?.span.end ?? 0 !== token.span.start) {
+      throw new Error(
+        fmt`token.span not continuous: previous token=${this.tokens.at(-1)}, current=${token}`,
+      );
     }
     this.tokens.push(token);
     this.allSpans.push(token);
@@ -75,14 +87,14 @@ export class CstIntermediateGroup {
     }
     this.codeSession = undefined;
     const lastToken = this.tokens.at(-1);
-    if (lastToken) this.extendSpan(lastToken.span.end);
+    if (lastToken) this.extendSpan(lastToken.span, lastToken);
   }
 
   /// Adding children
 
   addChild(child: CstGroup) {
     this.children.push(child);
-    this.extendSpan(child.span.end);
+    this.extendSpan(child.span, child);
 
     if (child.span.length > 0) {
       this.allowImplicit = true;

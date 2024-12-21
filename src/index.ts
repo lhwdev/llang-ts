@@ -1,20 +1,19 @@
 import { withContext } from "./cst-parse/CstParseContext.ts";
 import { CstParseContextImpl } from "./cst-parse/internal/CstParseContextImpl.ts";
 import { CstStringTokenizerContext } from "./cst-parse/internal/CstStringTokenizerContext.ts";
-import { eof, noImplicitNodes } from "./cst-parse/intrinsics.ts";
-import { cstImplicitOrNull } from "./parser/cstImplicit.ts";
+import { eof } from "./cst-parse/intrinsics.ts";
+import { cstLiteral } from "./parser/expression/cstLiteral.ts";
 
 (Error as any).stackTraceLimit = Infinity;
 
-const testCode = ` \n/* hi *///ho\n `;
+const testCode = `"hello, world!" /*this is comment*/ 123`;
 
 const tokenizer = new CstStringTokenizerContext(testCode);
 const context = new CstParseContextImpl<never>(tokenizer);
 
 withContext(context, () => {
-  noImplicitNodes();
   while (!eof()) {
-    const node = cstImplicitOrNull();
+    const node = cstLiteral();
     if (node) {
       console.log(node.dump());
     }

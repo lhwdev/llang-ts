@@ -1,10 +1,10 @@
 import { tokenKindName } from "../utils/debug.ts";
-import { valueToColorString } from "../utils/format.ts";
-import { ToFormatString } from "../utils/format.ts";
+import { format, valueToColorString } from "../utils/format.ts";
 import type { Span } from "./Span.ts";
 import { GetSpanSymbol, type Spanned } from "./Spanned.ts";
 import { TokenKind } from "./TokenKind.ts";
 import * as colors from "@std/fmt/colors";
+import type { TokenKinds } from "./TokenKinds.ts";
 
 /**
  * Why need a `Token`, when {@link TokenKind} already contains code? The reason
@@ -22,11 +22,20 @@ export class Token<Kind extends TokenKind = TokenKind> implements Spanned {
     readonly span: Span,
   ) {}
 
-  is<T extends TokenKind>(type: T | (abstract new (...args: any) => T)): this is Token<T> {
+  get code(): string {
+    return this.kind.code;
+  }
+
+  is<T extends TokenKind>(type: T | TokenKinds<T>): this is Token<T> {
     if (type instanceof TokenKind) {
       return this.kind === type as any;
     }
     return this.kind instanceof type;
+  }
+
+  as<T extends TokenKind>(type: T | TokenKinds<T>): Token<T> {
+    if (!this.is(type)) throw new TypeError(`this token ${this} is not type of ${type}`);
+    return this;
   }
 
   get [GetSpanSymbol](): Span {
@@ -39,7 +48,8 @@ export class Token<Kind extends TokenKind = TokenKind> implements Spanned {
       ` code='${this.kind.code}')`;
   }
 
-  [ToFormatString]() {
+  @format.print
+  format() {
     return `${colors.brightBlue(tokenKindName(this.kind))}` +
       `[${colors.yellow(this.span.start.toString())}, ` +
       `${colors.yellow((this.span.start + this.kind.code.length).toString())}]` +

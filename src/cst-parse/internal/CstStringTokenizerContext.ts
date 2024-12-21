@@ -1,6 +1,8 @@
+import { cyan, green } from "@std/fmt/colors";
 import { Span } from "../../token/Span.ts";
 import { Token } from "../../token/Token.ts";
 import type { TokenKind } from "../../token/TokenKind.ts";
+import { tokenKindName } from "../../utils/debug.ts";
 import { CstTokenizerContext } from "../tokenizer/CstTokenizerContext.ts";
 
 export class CstStringTokenizerContext extends CstTokenizerContext {
@@ -31,13 +33,13 @@ export class CstStringTokenizerContext extends CstTokenizerContext {
     return this.code.slice(start, start + length);
   }
 
-  private addToken(kind: TokenKind, start: number, length: number) {
-    // if (!this.isPeek) {
-    //   console.log(
-    //     `addToken kind=${cyan(tokenKindName(kind))}, start=${green(`${start}`)}, ` +
-    //       `code='${cyan(kind.code)}'`,
-    //   );
-    // }
+  private addToken<Kind extends TokenKind>(kind: Kind, start: number, length: number) {
+    if (!this.isPeek) {
+      console.log(
+        `addToken kind=${cyan(tokenKindName(kind))}, start=${green(`${start}`)}, ` +
+          `code='${cyan(kind.code)}'`,
+      );
+    }
 
     const token = new Token(kind, new Span(start, start + length));
 
@@ -47,7 +49,7 @@ export class CstStringTokenizerContext extends CstTokenizerContext {
     return token;
   }
 
-  override ifMatch(kind: TokenKind): Token | null {
+  override ifMatch<Kind extends TokenKind>(kind: Kind): Token<Kind> | null {
     const start = this.offset;
     const length = kind.code.length;
     const span = this.code.slice(start, start + length);
@@ -56,7 +58,10 @@ export class CstStringTokenizerContext extends CstTokenizerContext {
     return this.addToken(kind, start, length);
   }
 
-  protected override _create(fn: (span: string) => TokenKind, length: number): Token {
+  protected override _create<Kind extends TokenKind>(
+    fn: (span: string) => Kind,
+    length: number,
+  ): Token<Kind> {
     const start = this.offset;
     const kind = fn(this.code.slice(start, start + length));
 
@@ -64,7 +69,8 @@ export class CstStringTokenizerContext extends CstTokenizerContext {
   }
 
   override peek(offset: number = 0): CstTokenizerContext {
-    return new CstStringTokenizerContext(this.code, this.offset + offset, true);
+    // onToken is [], so any works done on .peek() is not reported
+    return new CstStringTokenizerContext(this.code, this.offset + offset, true, []);
   }
 
   override subscribe(onToken: (tokenizer: CstTokenizerContext, token: Token) => void) {

@@ -1,11 +1,15 @@
-import { CstNode } from "../cst-parse/CstNode.ts";
+import { bold, dim } from "@std/fmt/colors";
+import { CstNode } from "../cst/CstNode.ts";
 import { Span } from "../token/Span.ts";
 import { GetSpanSymbol, type Spanned } from "../token/Spanned.ts";
 import { TokenKind } from "../token/TokenKind.ts";
-import type { TokenKinds } from "../token/TokenKinds.ts";
-import { classToStringEntry, FormatEntries, formatRaw, objectToStringEntry } from "./format.ts";
+import {
+  classToStringEntry,
+  FormatEntries,
+  formatRaw,
+  objectLiteralToStringEntry,
+} from "./format.ts";
 import { type FormatEntry, formatFn } from "./format.ts";
-import { bold, dim } from "@std/fmt/colors";
 
 export function dumpNode(node: CstNode): string {
   return formatFn(null, () => dumpNodeEntry(node));
@@ -109,7 +113,7 @@ export function dumpNodeEntry(node: CstNode): FormatEntry {
     const list = new FormatEntries.list();
     list.push(new FormatEntries.value(bold(node.constructor.name)));
 
-    const group = objectToStringEntry(
+    const group = objectLiteralToStringEntry(
       node,
       " = ",
       (entry) => new FormatEntries.group(["(", false], entry, [")", false]),
@@ -120,10 +124,17 @@ export function dumpNodeEntry(node: CstNode): FormatEntry {
   });
 }
 
+export function tokenKindNames(kind: TokenKind): string[] {
+  const parents = [];
+  let kindType = Object.getPrototypeOf(kind);
+  while (kindType && kindType.constructor !== TokenKind) {
+    if (parents.length > 12) return ["<recursive>"];
+    parents.push(kindType.constructor.name);
+    kindType = Object.getPrototypeOf(kindType);
+  }
+  return parents.reverse();
+}
+
 export function tokenKindName(kind: TokenKind): string {
-  const kindsName = (kinds: { constructor: TokenKinds }): string => {
-    if (kinds.constructor === TokenKind) return "";
-    return `${kindsName(Object.getPrototypeOf(kinds))}.${kinds.constructor.name}`;
-  };
-  return kindsName(Object.getPrototypeOf(kind)).slice(1);
+  return tokenKindNames(kind).join(".");
 }

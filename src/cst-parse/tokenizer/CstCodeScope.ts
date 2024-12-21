@@ -1,5 +1,6 @@
 import type { Token } from "../../token/Token.ts";
-import type { TokenKind, Tokens } from "../../token/TokenKind.ts";
+import type { TokenKind } from "../../token/TokenKind.ts";
+import type { Tokens } from "../../token/Tokens.ts";
 import { isTokenKindMatch, type TokenKinds } from "../../token/TokenKinds.ts";
 import type { CstTokenizerContext } from "./CstTokenizerContext.ts";
 
@@ -16,10 +17,17 @@ export abstract class CstCodeScope {
     return isTokenKindMatch(token.kind, kind) ? token : null;
   }
 
+  consume<Kind extends TokenKind>(token: Token<Kind>): Token<Kind> {
+    return this.code.consume(token);
+  }
+
   abstract peek(): this;
 }
 
 export interface CstCodeScopes {
   normal(): CstCodeScope;
   comment(kind: Tokens.Comments.Kind): CstCodeScope & { readonly depth: number };
+  stringLiteral(
+    kind: Tokens.Literal.String.Kind,
+  ): CstCodeScope & { variableTemplate(): CstCodeScope };
 }

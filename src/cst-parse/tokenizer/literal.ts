@@ -1,8 +1,9 @@
 import type { Token } from "../../token/Token.ts";
-import { Tokens } from "../../token/TokenKind.ts";
+import { Tokens } from "../../token/Tokens.ts";
 import { parseIdentifierLike } from "./common.ts";
 import { CstCodeScope } from "./CstCodeScope.ts";
 import type { CstTokenizerContext } from "./CstTokenizerContext.ts";
+import { parseIdentifierToken } from "./identifier.ts";
 import { parseLineBreakToken } from "./lineBreak.ts";
 
 const digits = "0123456789_";
@@ -102,13 +103,21 @@ export class StringLiteralScope extends CstCodeScope {
       if (kind.type != "multiLine") throw new Error("TODO??");
       return token;
     }
+    if (code.current === Tokens.Literal.String.Escape.EscapeChar) {
+      const text = code.get(1);
+      if (text === "u") { // unicode escape, such as \uf0ff
+        return code.create(Tokens.Literal.String.Escape, 6);
+      } else { // other escapes; \\, \n, \{ etc
+        return code.create(Tokens.Literal.String.Escape, 2);
+      }
+    }
     if (token = code.ifMatch(kind.right)) {
       return token;
     }
-    if (token = code.ifMatch(Tokens.Literal.String.Escape.ExprBegin)) {
+    if (token = code.ifMatch(Tokens.Literal.String.Template.ExprBegin)) {
       return token;
     }
-    if (token = code.ifMatch(Tokens.Literal.String.Escape.VariableBegin)) {
+    if (token = code.ifMatch(Tokens.Literal.String.Template.VariableBegin)) {
       return token;
     }
     return null;
@@ -124,7 +133,7 @@ export class StringLiteralScope extends CstCodeScope {
       return token;
     }
 
-    let offset = 0;
+    let offset = 1;
     while (offset < code.remaining) {
       if (token = this.matchSpecial(code.peek(offset))) {
         this.nextCache = token;
@@ -135,12 +144,27 @@ export class StringLiteralScope extends CstCodeScope {
     }
     return code.create(Tokens.Literal.String.Text, offset);
   }
-
   override nextAny(): Token {
     return this.match(this.code);
   }
 
   override peek(): this {
-    return new StringLiteralScope(this.kind, this.code) as this;
+    return new StringLiteralScope(this.kind, this.code.peek()) as this;
+  }
+
+  variableTemplate(): CstCodeScope {
+    class VariableTemplate extends StringLiteralScope {
+      override nextAny(): Token {
+        let token;
+        if (token = parseIdentifierToken(this.code)) {
+          return token;
+        }
+        return super.nextAny();
+      }
+      override peek(): this {
+        return new VariableTemplate(this.kind, this.code.peek()) as this;
+      }
+    }
+    return new VariableTemplate(this.kind, this.code);
   }
 }

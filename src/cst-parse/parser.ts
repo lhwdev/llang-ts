@@ -1,9 +1,16 @@
-import type { CstNode } from "./CstNode.ts";
-import type { CstNodeInfo } from "./CstNodeInfo.ts";
-import { context } from "./CstParseContext.ts";
+import { yellow } from "@std/fmt/colors";
+import type { CstNode } from "../cst/CstNode.ts";
+import type { CstNodeInfo } from "../cst/CstNodeInfo.ts";
+import { node, nullableNode } from "./inlineNode.ts";
 
 export interface CstParser<Node extends CstNode> {
   info: CstNodeInfo<Node>;
+}
+
+function parserName(info: CstNodeInfo<any>): string {
+  const name = info.name;
+  if (!name.length) return "";
+  return yellow(name[0].toLowerCase() + name.slice(1));
 }
 
 export function rawParser<Params extends any[], Node extends CstNode, R>(
@@ -19,16 +26,9 @@ export function parser<Params extends any[], Node extends CstNode>(
   info: CstNodeInfo<Node>,
   impl: (...args: Params) => Node,
 ): CstParser<Node> & ((...args: Params) => Node) {
+  Object.defineProperty(impl, "name", { value: parserName(info) });
   return rawParser(info, (...args) => {
-    const child = context.beginChild(info);
-    try {
-      const node = impl(...args);
-      return child.end(node);
-    } catch (e) {
-      const result = child.endWithError(e);
-      if (!result) throw new Error("parse failed: TODO error message", { cause: e });
-      return result;
-    }
+    return node(info, () => impl(...args));
   });
 }
 
@@ -36,19 +36,8 @@ export function nullableParser<Params extends any[], Node extends CstNode>(
   info: CstNodeInfo<Node>,
   impl: (...args: Params) => Node | null,
 ): CstParser<Node> & ((...args: Params) => Node | null) {
+  Object.defineProperty(impl, "name", { value: parserName(info) });
   return rawParser(info, (...args) => {
-    const child = context.beginChild(info);
-    try {
-      const node = impl(...args);
-      if (node) {
-        return child.end(node);
-      } else {
-        return child.endWithError(null);
-      }
-    } catch (e) {
-      const result = child.endWithError(e);
-      if (!result) throw new Error("parse failed: TODO error message", { cause: e });
-      return result;
-    }
+    return nullableNode(info, () => impl(...args));
   });
 }

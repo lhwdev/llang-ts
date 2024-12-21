@@ -1,6 +1,6 @@
-import { CstNode } from "../cst-parse/CstNode.ts";
+import { CstNode } from "./CstNode.ts";
 import type { Token } from "../token/Token.ts";
-import { Tokens } from "../token/TokenKind.ts";
+import { Tokens } from "../token/Tokens.ts";
 
 export class CstImplicit extends CstNode {}
 

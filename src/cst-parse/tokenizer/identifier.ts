@@ -1,5 +1,5 @@
 import type { Token } from "../../token/Token.ts";
-import { Tokens } from "../../token/TokenKind.ts";
+import { Tokens } from "../../token/Tokens.ts";
 import type { CstTokenizerContext } from "./CstTokenizerContext.ts";
 // @ts-types="npm:@types/unicode-properties"
 import * as unicode from "unicode-properties";

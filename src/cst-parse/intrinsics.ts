@@ -1,3 +1,5 @@
+import type { Token } from "../token/Token.ts";
+import type { TokenKind } from "../token/TokenKind.ts";
 import { variableWrapper } from "../utils/variableWrapper.ts";
 import type { CstCodeContext } from "./CstCodeContext.ts";
 import { getContext } from "./CstParseContext.ts";
@@ -12,6 +14,12 @@ export function code<R>(scope: CstCodeScope, fn: (code: CstCodeContext) => R): R
  */
 export function code<R>(a: any, b?: any): R {
   return getContext().code(a, b);
+}
+
+export namespace code {
+  export function consume<Kind extends TokenKind>(token: Token<Kind>): Token<Kind> {
+    return code((c) => c.consume(token));
+  }
 }
 
 export function eof(): boolean {

@@ -6,18 +6,86 @@ import {
   green,
   italic,
   magenta,
+  red,
   stripAnsiCode,
   yellow,
 } from "@std/fmt/colors";
+
+export function fmt(strings: TemplateStringsArray, ...args: any[]): string;
+export function fmt(options?: Options): (strings: TemplateStringsArray, ...args: any[]) => string;
+
+export function fmt(a?: any, ...args: any): any {
+  if (Array.isArray(a)) {
+    return fmtTemplate(a as any, ...args);
+  } else {
+    return (strings: TemplateStringsArray, ...args: any[]) =>
+      formatRaw(a, () => fmtTemplate(strings, ...args));
+  }
+}
+
+export namespace fmt {
+  export function parameter(name: any) {
+    return new ValueEntry(red(name.toString()));
+  }
+}
+
+function fmtTemplate(strings: TemplateStringsArray, ...args: any[]): string {
+  let result = "";
+  for (let i = 0; i < strings.length; i++) {
+    if (i != 0) result += format(args[i - 1]);
+    result += strings[i];
+  }
+  return result;
+}
 
 export function format(value: any, options?: Options): string {
   return valueToColorString(value, options);
 }
 
-export const ToFormatString = Symbol("ToFormatString");
-export const FormatObjectEntries = Symbol("FormatObjectEntries");
+export function formatClass(value: any, options?: Options): string {
+  return classToString(value, { ...options, handleObject: classToStringEntry });
+}
+
+/// Format Symbols & Constants
+export const ToFormatString = Symbol("ToFormatString"); // function: () => string
+export const FormatObjectEntries = Symbol("FormatObjectEntries"); // value: get () => string
+export const FormatClassName = Symbol("FormatClassName"); // value: get () => string
 export const MaxWidth = 80;
 export const Indent = "  ";
+
+/// Format decorators
+function formatSymbolDecorator(
+  symbol: symbol,
+  isValue: boolean,
+): (
+  value: any,
+  context: ClassMethodDecoratorContext | ClassGetterDecoratorContext | ClassFieldDecoratorContext,
+) => void {
+  return (_value, context) => {
+    if (isValue && context.kind === "method") {
+      return context.addInitializer(function () {
+        Object.defineProperty(this, symbol, {
+          get() {
+            return context.access.get(this).call(this);
+          },
+          enumerable: false,
+        });
+      });
+    }
+    context.addInitializer(function () {
+      Object.defineProperty(this, symbol, {
+        get: () => context.access.get(this),
+        enumerable: false,
+      });
+    });
+  };
+}
+
+export namespace format {
+  export const className = formatSymbolDecorator(FormatClassName, true);
+  export const objectEntries = formatSymbolDecorator(FormatObjectEntries, true);
+  export const print = formatSymbolDecorator(ToFormatString, false);
+}
 
 export const ObjectStack: object[] = [];
 
@@ -300,14 +368,16 @@ export function valueToColorStringEntry(
       } else if (ObjectStack.includes(value)) {
         v = italic("[recurse]");
       } else {
+        if (value instanceof Entry) return value;
+
         let result;
         if (ToFormatString in value) {
           result = value[ToFormatString]();
         } else {
           result = Options.handleObject(value);
         }
-        if (typeof result === "string") return new ValueEntry(result);
         if (result instanceof Entry) return result;
+        if (typeof result === "string") return new ValueEntry(result);
         throw new Error(`wrong result instance: ${result}`, { cause: result });
       }
       break;
@@ -333,10 +403,8 @@ export function classPropertiesToString(
   return formatFn(options, () => classPropertiesToStringEntry(data));
 }
 
-export function classPropertiesToStringEntry(
-  data: object,
-): Entry {
-  return objectToStringEntry(
+export function classPropertiesToStringEntry(data: object): Entry {
+  return objectLiteralToStringEntry(
     data,
     " = ",
     (entry) => new GroupEntry(["(", false], entry, [")", false]),
@@ -347,19 +415,24 @@ export function classToString(
   data: object,
   options?: Options,
 ): string {
-  return formatFn(options, () => classPropertiesToStringEntry(data));
+  return formatFn(options, () => classToStringEntry(data));
 }
 
 export function classToStringEntry(
   data: object,
 ): Entry {
   const list = new ListEntry();
-  const name = data.constructor?.name ?? "Object";
+  const name = FormatClassName in data
+    ? data[FormatClassName] as string
+    : data.constructor?.name ?? "Object";
   if (name == "Object") {
-    return objectToStringEntry(data);
+    return objectLiteralToStringEntry(data);
   }
-  list.push(new ValueEntry(bold(name)));
-  const obj = objectToStringEntry(
+  if (typeof name !== "string") {
+    throw new Error(fmt`${fmt.parameter("name")} is ${name}; expected string`);
+  }
+  list.push(new ValueEntry(name.includes("\x1b") ? name : bold(name)));
+  const obj = objectLiteralToStringEntry(
     data,
     " = ",
     (entry) => new GroupEntry(["(", false], entry, [")", false]),
@@ -375,7 +448,20 @@ export function objectToString(
   return formatFn(options, () => objectToStringEntry(data));
 }
 
-export function objectToStringEntry(
+export function objectToStringEntry(data: object) {
+  const name = data.constructor?.name;
+  if (!name || name === "Object") return objectLiteralToStringEntry(data);
+  return classToStringEntry(data);
+}
+
+export function objectLiteralToString(
+  data: object,
+  options?: Options,
+): string {
+  return formatFn(options, () => objectLiteralToStringEntry(data));
+}
+
+export function objectLiteralToStringEntry(
   data: object,
   between: string = ": ",
   newGroup: (entry: ObjectEntry) => Entry = (entry) =>
@@ -389,14 +475,11 @@ export function objectToStringEntry(
   try {
     const important = Options.important(data);
     for (const [key, value] of formatEntries(data)) {
-      const item = new ListEntry(false);
-      item.push(new ValueEntry(`${important ? brightWhite(key) : key}${dim(between)}`), [
-        true,
-        false,
-      ]);
-      item.push(valueToColorStringEntry(value), [false, false]);
-      item.push(new TrailingEntry(","), [false, true]);
-      result.push(mapItem ? mapItem(key, value, item) : item);
+      const item = new ListEntry();
+      item.push(new ValueEntry(`${important ? brightWhite(key) : key}${dim(between)}`));
+      item.push(valueToColorStringEntry(value));
+      item.push(new TrailingEntry(","));
+      result.push(mapItem ? mapItem(key, value, item) : item, [true, true]);
     }
   } finally {
     ObjectStack.pop();
@@ -408,7 +491,9 @@ export function formatEntries(data: object): readonly [any, any][] {
   if (FormatObjectEntries in data) {
     return data[FormatObjectEntries] as any;
   }
-  return Object.entries(data);
+  const entries = Object.entries(data);
+  (entries as any)[FormatObjectEntries] = entries;
+  return entries;
 }
 
 export function arrayToStringEntry(
@@ -428,7 +513,7 @@ export function arrayToStringEntry(
   return new GroupEntry(["[", false], result, ["]", false]);
 }
 
-export function formatRaw(options: Options | undefined | null, fn: () => Entry): Entry {
+export function formatRaw<T>(options: Options | undefined | null, fn: () => T): T {
   const previous = Options;
   Options = options ? { ...previous, ...options } : previous;
   try {

@@ -1,5 +1,6 @@
 import type { Token } from "../../token/Token.ts";
-import { type TokenKind, Tokens } from "../../token/TokenKind.ts";
+import type { TokenKind } from "../../token/TokenKind.ts";
+import { Tokens } from "../../token/Tokens.ts";
 import { isTokenKindMatch, type TokenKinds } from "../../token/TokenKinds.ts";
 import { CstCodeContext } from "../CstCodeContext.ts";
 import type { CstTokenizerContext } from "../tokenizer/CstTokenizerContext.ts";
@@ -13,6 +14,8 @@ export class CstCodeContextImpl extends CstCodeContext {
   }
 
   scope!: CstCodeScope;
+
+  private peekBuffer: [CstCodeScope, Token] | null = null;
 
   protected nextToken<Kind extends TokenKind>(
     scope: CstCodeScope,
@@ -35,6 +38,13 @@ export class CstCodeContextImpl extends CstCodeContext {
   override next<Kind extends TokenKind>(kind: TokenKinds<Kind>): Token<Kind> | null;
 
   override next(kind?: any): any {
+    if (this.peekBuffer) {
+      const [scope, token] = this.peekBuffer;
+      this.peekBuffer = null;
+      if (scope === this.scope) {
+        return this.scope.consume(token);
+      }
+    }
     return this.nextToken(this.scope, kind);
   }
 
@@ -43,7 +53,22 @@ export class CstCodeContextImpl extends CstCodeContext {
   override peek<Kind extends TokenKind>(kind: TokenKinds<Kind>): Token<Kind> | null;
 
   override peek(kind?: any): Token | null {
-    return this.nextToken(this.scope.peek(), kind);
+    if (this.peekBuffer) {
+      const [scope, token] = this.peekBuffer;
+      if (scope === this.scope) {
+        if (!kind || isTokenKindMatch(token.kind, kind)) return token;
+        return null;
+      } else {
+        this.peekBuffer = null;
+      }
+    }
+    const peekScope = this.scope.peek();
+    if (peekScope.code === this.scope.code) {
+      throw new Error("CstCodeScope.peek() should use code.peek() as its new code.");
+    }
+    const token = this.nextToken(peekScope, kind);
+    if (token) this.peekBuffer = [this.scope, token];
+    return token;
   }
 
   override expect<Kind extends TokenKind>(kind: Kind): Token<Kind>;
@@ -53,5 +78,20 @@ export class CstCodeContextImpl extends CstCodeContext {
     const result = this.next(kind);
     if (!result) throw new Error(`expected ${kind}, but got ${result}`);
     return result;
+  }
+
+  override consume<Kind extends TokenKind>(token: Token<Kind>): Token<Kind> {
+    if (this.peekBuffer) {
+      const [scope, peekToken] = this.peekBuffer;
+      if (scope === this.scope) {
+        if (peekToken !== token) {
+          throw new Error(`invalid consume: expected ${peekToken}, but got ${token}`);
+        }
+      }
+      this.peekBuffer = null;
+    } else {
+      // this is nonsense, but maybe it can happen..????
+    }
+    return this.scope.consume(token);
   }
 }

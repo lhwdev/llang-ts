@@ -1,8 +1,8 @@
 import type { Span } from "../token/Span.ts";
 import { GetSpanSymbol, type Spanned } from "../token/Spanned.ts";
-import { dumpNode, dumpNodeEntries, dumpNodeEntry } from "../utils/debug.ts";
-import { FormatObjectEntries, ToFormatString } from "../utils/format.ts";
-import { context } from "./CstParseContext.ts";
+import { dumpNode, dumpNodeEntries } from "../utils/debug.ts";
+import { format, FormatObjectEntries } from "../utils/format.ts";
+import { context } from "../cst-parse/CstParseContext.ts";
 import type { CstTree } from "./CstTree.ts";
 
 export class CstNode implements CstNode, Spanned {
@@ -16,12 +16,9 @@ export class CstNode implements CstNode, Spanned {
 
   /// Formatting
 
+  @format.print
   dump(): string {
     return dumpNode(this);
-  }
-
-  [ToFormatString]() {
-    return dumpNodeEntry(this);
   }
 
   get [FormatObjectEntries](): readonly [any, any][] {

@@ -1,5 +1,5 @@
 import type { Token } from "../../token/Token.ts";
-import { Tokens } from "../../token/TokenKind.ts";
+import { Tokens } from "../../token/Tokens.ts";
 import { CstCodeScope } from "./CstCodeScope.ts";
 import type { CstTokenizerContext } from "./CstTokenizerContext.ts";
 import { parseLineBreakToken } from "./lineBreak.ts";

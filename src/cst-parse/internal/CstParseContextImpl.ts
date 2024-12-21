@@ -1,14 +1,11 @@
 import { cstImplicitOrNull } from "../../parser/cstImplicit.ts";
 import type { CstCodeContext } from "../CstCodeContext.ts";
-import type { CstNode } from "../CstNode.ts";
-import type { CstNodeInfo } from "../CstNodeInfo.ts";
 import {
   context as RootContext,
   type CstNodeHintType,
   type CstParseContext,
   withContext,
 } from "../CstParseContext.ts";
-import type { CstTree } from "../CstTree.ts";
 import type { CstTokenizerContext } from "../tokenizer/CstTokenizerContext.ts";
 import type { CstCodeScope, CstCodeScopes } from "../tokenizer/CstCodeScope.ts";
 import { CodeScopesImpl } from "../tokenizer/scopes.ts";
@@ -16,6 +13,9 @@ import { CstCodeContextImpl } from "./CstCodeContextImpl.ts";
 import { CstIntermediateGroup, CstRootGroup } from "./CstGroup.ts";
 import { format } from "../../utils/format.ts";
 import { dim } from "@std/fmt/colors";
+import type { CstNode } from "../../cst/CstNode.ts";
+import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
+import type { CstTree } from "../../cst/CstTree.ts";
 
 export class CstParseContextImpl<Node extends CstNode> implements CstParseContext<Node> {
   constructor(
@@ -66,7 +66,7 @@ export class CstParseContextImpl<Node extends CstNode> implements CstParseContex
     try {
       const result = fn(this.c);
       if (result) {
-        this.debugC(`code(${fn}) -> ${format(result)}`);
+        this.debugC(`code(${this.c.scope.constructor.name}, ${fn}) -> ${format(result)}`);
       }
       return result;
     } finally {
