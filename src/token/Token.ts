@@ -3,7 +3,7 @@ import { format, valueToColorString } from "../utils/format.ts";
 import type { Span } from "./Span.ts";
 import { GetSpanSymbol, type Spanned } from "./Spanned.ts";
 import { TokenKind } from "./TokenKind.ts";
-import * as colors from "@std/fmt/colors";
+import * as colors from "../utils/colors.ts";
 import type { TokenKinds } from "./TokenKinds.ts";
 
 /**
@@ -15,6 +15,11 @@ import type { TokenKinds } from "./TokenKinds.ts";
  *
  * 2. Token should be able to contain information such as {@link span}, error,
  *    etc.
+ *
+ * 3. Token should be authentic, which means Token can only be created by
+ *    `CstTokenizerContext`. This ensures that some operations like
+ *    `code((c) => c.consume(token))` can trust input token and continue without
+ *    any complicated validation.
  */
 export class Token<Kind extends TokenKind = TokenKind> implements Spanned {
   constructor(

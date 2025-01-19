@@ -1,4 +1,4 @@
-import { bold, gray } from "@std/fmt/colors";
+import { bold, gray } from "../utils/colors.ts";
 import { tokenKindName, tokenKindNames } from "../utils/debug.ts";
 import { format, formatClass } from "../utils/format.ts";
 

@@ -8,7 +8,7 @@ import type { CstCodeScope } from "../tokenizer/CstCodeScope.ts";
 
 export class CstCodeContextImpl extends CstCodeContext {
   constructor(
-    readonly code: CstTokenizerContext,
+    readonly tokenizer: CstTokenizerContext,
   ) {
     super();
   }
@@ -17,12 +17,16 @@ export class CstCodeContextImpl extends CstCodeContext {
 
   private peekBuffer: [CstCodeScope, Token] | null = null;
 
+  get debugNext(): string {
+    return this.tokenizer.span(10);
+  }
+
   protected nextToken<Kind extends TokenKind>(
     scope: CstCodeScope,
     kind?: Kind | TokenKinds<Kind>,
   ): Token<Kind> | null {
     if (scope.code.remaining == 0) {
-      const token = scope.code.match(Tokens.Eof);
+      const token = scope.code.match(Tokens.End);
       if (!kind) return token as any;
       return isTokenKindMatch(token.kind, kind) ? token : null as any;
     }
@@ -93,5 +97,15 @@ export class CstCodeContextImpl extends CstCodeContext {
       // this is nonsense, but maybe it can happen..????
     }
     return this.scope.consume(token);
+  }
+
+  override snapshot(): unknown {
+    return { tokenizer: this.tokenizer.snapshot() };
+  }
+
+  override restore(to: unknown): void {
+    const state = to as { tokenizer: unknown };
+    this.tokenizer.restore(state.tokenizer);
+    this.peekBuffer = null;
   }
 }

@@ -17,7 +17,10 @@ export abstract class CstCodeContext {
 
   abstract consume<Kind extends TokenKind>(token: Token<Kind>): Token<Kind>;
 
-  eof(): boolean {
-    return this.peek(Tokens.Eof) !== null;
+  end(): boolean {
+    return this.peek(Tokens.End) !== null;
   }
+
+  abstract snapshot(): unknown;
+  abstract restore(to: unknown): void;
 }

@@ -4,8 +4,10 @@ import { CstNode } from "../CstNode.ts";
 import type { CstType } from "./CstType.ts";
 
 export class CstTypeArguments extends CstNode {
+  declare private $typeArguments: void;
+
   constructor(
-    readonly items: readonly [Token<Tokens.Identifier> | null, CstType][],
+    readonly items: readonly [name: Token<Tokens.Identifier> | null, value: CstType][],
   ) {
     super();
   }

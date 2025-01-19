@@ -1,4 +1,5 @@
 import type { Token } from "../../token/Token.ts";
+import type { TokenKinds } from "../../token/TokenKinds.ts";
 import { Tokens } from "../../token/Tokens.ts";
 import { parseIdentifierLike } from "./common.ts";
 import { CstCodeScope } from "./CstCodeScope.ts";
@@ -107,6 +108,8 @@ export class StringLiteralScope extends CstCodeScope {
       const text = code.get(1);
       if (text === "u") { // unicode escape, such as \uf0ff
         return code.create(Tokens.Literal.String.Escape, 6);
+      } else if (text === "x") { // ascii code, such as \x1b
+        return code.create(Tokens.Literal.String.Escape, 4);
       } else { // other escapes; \\, \n, \{ etc
         return code.create(Tokens.Literal.String.Escape, 2);
       }
@@ -123,7 +126,7 @@ export class StringLiteralScope extends CstCodeScope {
     return null;
   }
 
-  private match(code: CstTokenizerContext): Token {
+  override match(code: CstTokenizerContext, _kind: TokenKinds): Token {
     let token;
     if (token = this.nextCache) {
       this.nextCache = null;
@@ -143,9 +146,6 @@ export class StringLiteralScope extends CstCodeScope {
       offset++;
     }
     return code.create(Tokens.Literal.String.Text, offset);
-  }
-  override nextAny(): Token {
-    return this.match(this.code);
   }
 
   override peek(): this {

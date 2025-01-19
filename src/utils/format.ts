@@ -1,4 +1,5 @@
 import {
+  AllFormats,
   bold,
   brightWhite,
   dim,
@@ -9,25 +10,127 @@ import {
   red,
   stripAnsiCode,
   yellow,
-} from "@std/fmt/colors";
+} from "./colors.ts";
 
-export function fmt(strings: TemplateStringsArray, ...args: any[]): string;
-export function fmt(options?: Options): (strings: TemplateStringsArray, ...args: any[]) => string;
+type ParametersExcept0<F extends (...args: any) => any> = F extends
+  (arg0: any, ...args: infer T) => any ? T
+  : never;
 
-export function fmt(a?: any, ...args: any): any {
+interface FormatFn<F extends (value: string, ...args: any) => string> {
+  (
+    value: Entry | (() => Entry | string) | string,
+    ...args: ParametersExcept0<F>
+  ): Entry;
+  (
+    ...args: ParametersExcept0<F>
+  ): (strings: TemplateStringsArray, ...args: any) => Entry;
+  (
+    ...args: ParametersExcept0<F>["length"] extends 0
+      ? [strings: TemplateStringsArray, ...args: any]
+      : never
+  ): Entry;
+}
+type Formats = {
+  [Key in keyof AllFormats]: FormatFn<AllFormats[Key]>;
+};
+interface Fmt extends Formats {
+  (strings: TemplateStringsArray, ...args: any[]): string;
+  (options?: Options): (strings: TemplateStringsArray, ...args: any[]) => string;
+
+  entry(strings: TemplateStringsArray, ...args: any[]): Entry;
+
+  symbol(name: unknown): Entry;
+  parameter(name: unknown): Entry;
+  code(name: unknown): Entry;
+  lazy(fn: () => Entry | string): Entry;
+
+  classLike(name: string, content: Entry | string): Entry;
+}
+
+function mapInput(input: Entry | unknown): Entry {
+  if (input instanceof Entry) return input;
+  return new ValueEntry(`${input}`);
+}
+
+export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
   if (Array.isArray(a)) {
     return fmtTemplate(a as any, ...args);
   } else {
     return (strings: TemplateStringsArray, ...args: any[]) =>
       formatRaw(a, () => fmtTemplate(strings, ...args));
   }
-}
+}, {
+  entry(strings: TemplateStringsArray, ...args: any[]) {
+    const result = new ListEntry();
+    for (let i = 0; i < strings.length; i++) {
+      if (i != 0) result.push(valueToColorStringEntry(args[i - 1]));
+      result.push(new ValueEntry(strings[i]));
+    }
+    return result;
+  },
 
-export namespace fmt {
-  export function parameter(name: any) {
-    return new ValueEntry(red(name.toString()));
-  }
-}
+  symbol(name: unknown) {
+    return this.yellow(`${name}`);
+  },
+
+  parameter(name: unknown) {
+    return new ValueEntry(red(`${name}`));
+  },
+
+  code(content: unknown) {
+    return new ValueEntry(`${content}`);
+  },
+
+  lazy(fn: () => Entry | string) {
+    return new LazyEntry(() => mapInput(fn()));
+  },
+
+  classLike(name: string, content: Entry | string) {
+    const list = new ListEntry();
+    list.push(
+      new ValueEntry(
+        name.includes("\x1b")
+          ? name
+          : content instanceof ObjectEntry && Options.important(content.value)
+          ? bold(name)
+          : name,
+      ),
+    );
+    list.push(new GroupEntry(["(", false], mapInput(content), [")", false]));
+    return list;
+  },
+
+  ...Object.fromEntries(
+    Object.entries(AllFormats as Record<string, (value: string, ...args: any) => string>)
+      .map(([key, fn]) => [key, (...args: any[]) => {
+        if (fn.length === 1) {
+          const strings = args[0];
+          if (Array.isArray(strings) && typeof strings.at(0) === "string" && "raw" in strings) {
+            return new StyleEntry(fn, fmt.entry(strings as TemplateStringsArray, ...args.slice(1)));
+          }
+        }
+        if (args.length === fn.length) {
+          const [value, ...other] = args;
+          if (value instanceof Entry) {
+            return new StyleEntry((str) => fn(str, ...other), value);
+          } else if (typeof value === "function") {
+            return new StyleEntry(
+              (str) => fn(str, ...other),
+              new LazyEntry(() => {
+                const v = value();
+                return v instanceof Entry ? v : new ValueEntry(`${v}`);
+              }),
+            );
+          } else {
+            return new ValueEntry(fn(`${value}`, ...other));
+          }
+        } else {
+          return (str: TemplateStringsArray, ...args: any) =>
+            new StyleEntry((str) => fn(str, ...args), fmt.entry(str, ...args));
+        }
+      }]),
+  ) as any as Formats,
+});
 
 function fmtTemplate(strings: TemplateStringsArray, ...args: any[]): string {
   let result = "";
@@ -57,6 +160,7 @@ export const Indent = "  ";
 function formatSymbolDecorator(
   symbol: symbol,
   isValue: boolean,
+  map: (value: any) => any = (value) => value,
 ): (
   value: any,
   context: ClassMethodDecoratorContext | ClassGetterDecoratorContext | ClassFieldDecoratorContext,
@@ -66,7 +170,7 @@ function formatSymbolDecorator(
       return context.addInitializer(function () {
         Object.defineProperty(this, symbol, {
           get() {
-            return context.access.get(this).call(this);
+            return map(context.access.get(this).call(this));
           },
           enumerable: false,
         });
@@ -74,7 +178,7 @@ function formatSymbolDecorator(
     }
     context.addInitializer(function () {
       Object.defineProperty(this, symbol, {
-        get: () => context.access.get(this),
+        get: () => map(context.access.get(this)),
         enumerable: false,
       });
     });
@@ -84,7 +188,26 @@ function formatSymbolDecorator(
 export namespace format {
   export const className = formatSymbolDecorator(FormatClassName, true);
   export const objectEntries = formatSymbolDecorator(FormatObjectEntries, true);
-  export const print = formatSymbolDecorator(ToFormatString, false);
+
+  export const print = formatSymbolDecorator(
+    ToFormatString,
+    false,
+    (fn) =>
+      function (this: any, ...args: any) {
+        try {
+          return fn.call(this, ...args);
+        } catch (e) {
+          throw new Error(
+            `while printing ${
+              typeof this === "object" && this
+                ? this.constructor.name
+                : Object.prototype.toString.call(this)
+            }`,
+            { cause: e },
+          );
+        }
+      },
+  );
 }
 
 export const ObjectStack: object[] = [];
@@ -160,12 +283,16 @@ class MultiLineOutput {
 abstract class Entry {
   abstract oneLine(output: OneLineOutput): void;
   abstract multiLine(output: MultiLineOutput): void;
+
+  toString() {
+    return format(this);
+  }
 }
 
 class GroupEntry extends Entry {
   constructor(
     readonly left: [string, spacing: boolean],
-    readonly item: ObjectEntry,
+    readonly item: Entry,
     readonly right: [string, spacing: boolean],
   ) {
     super();
@@ -207,6 +334,19 @@ class ValueEntry extends Entry {
   }
   override multiLine(output: MultiLineOutput): void {
     output.print(this.text);
+  }
+}
+
+class LazyEntry extends Entry {
+  constructor(readonly calculate: () => Entry) {
+    super();
+  }
+
+  override oneLine(output: OneLineOutput) {
+    this.calculate().oneLine(output);
+  }
+  override multiLine(output: MultiLineOutput): void {
+    this.calculate().multiLine(output);
   }
 }
 
@@ -382,6 +522,13 @@ export function valueToColorStringEntry(
       }
       break;
     case "function": {
+      if (ToFormatString in value) {
+        const result = value[ToFormatString]();
+        if (result instanceof Entry) return result;
+        if (typeof result === "string") return new ValueEntry(result);
+        throw new Error(`wrong result instance: ${result}`, { cause: result });
+      }
+
       const str = `${value}`;
       let text;
       if (str.startsWith("class ")) {
@@ -415,23 +562,29 @@ export function classToString(
   data: object,
   options?: Options,
 ): string {
-  return formatFn(options, () => classToStringEntry(data));
+  return formatFn(options, () => classToStringEntry(data, true));
 }
 
 export function classToStringEntry(
   data: object,
+  fallback: boolean = false,
 ): Entry {
-  const list = new ListEntry();
   const name = FormatClassName in data
-    ? data[FormatClassName] as string
+    ? `${data[FormatClassName]}`
     : data.constructor?.name ?? "Object";
-  if (name == "Object") {
-    return objectLiteralToStringEntry(data);
-  }
   if (typeof name !== "string") {
     throw new Error(fmt`${fmt.parameter("name")} is ${name}; expected string`);
   }
-  list.push(new ValueEntry(name.includes("\x1b") ? name : bold(name)));
+
+  if (fallback) {
+    if (Array.isArray(data)) return arrayToStringEntry(data);
+    if (name === "Object") return objectLiteralToStringEntry(data);
+  }
+
+  const list = new ListEntry();
+  list.push(
+    new ValueEntry(name.includes("\x1b") ? name : Options.important(data) ? bold(name) : name),
+  );
   const obj = objectLiteralToStringEntry(
     data,
     " = ",
@@ -449,6 +602,7 @@ export function objectToString(
 }
 
 export function objectToStringEntry(data: object) {
+  if (Array.isArray(data)) return arrayToStringEntry(data);
   const name = data.constructor?.name;
   if (!name || name === "Object") return objectLiteralToStringEntry(data);
   return classToStringEntry(data);
@@ -468,8 +622,9 @@ export function objectLiteralToStringEntry(
     new GroupEntry(["{", true], entry, ["}", true]),
   mapItem?: (key: string, value: any, item: ListEntry) => Entry,
 ): Entry {
-  if (Array.isArray(data)) return arrayToStringEntry(data);
   const result = new ObjectEntry(data);
+
+  if (ObjectStack.filter((v) => v === data).length > 2) return new ValueEntry("recurse");
   ObjectStack.push(data);
 
   try {
@@ -500,6 +655,8 @@ export function arrayToStringEntry(
   data: any[],
 ): Entry {
   const result = new ObjectEntry(data);
+  ObjectStack.push(data);
+
   try {
     for (const value of Object.values(data)) {
       const item = new ListEntry(false);
@@ -511,6 +668,15 @@ export function arrayToStringEntry(
     ObjectStack.pop();
   }
   return new GroupEntry(["[", false], result, ["]", false]);
+}
+
+export function formatFor<T>(value: any, fn: () => T): T {
+  ObjectStack.push(value);
+  try {
+    return fn();
+  } finally {
+    ObjectStack.pop();
+  }
 }
 
 export function formatRaw<T>(options: Options | undefined | null, fn: () => T): T {
@@ -528,6 +694,9 @@ export function formatFn(options: Options | undefined | null, fn: () => Entry): 
   Options = options ? { ...previous, ...options } : previous;
   try {
     const entry = fn();
+    if (!(entry instanceof Entry)) {
+      throw new TypeError(`fn did not return Entry, result=${entry} fn=${fn}`);
+    }
     let r;
     try {
       const output = new OneLineOutput();

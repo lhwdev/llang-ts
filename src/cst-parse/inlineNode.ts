@@ -1,14 +1,16 @@
 import type { CstNode } from "../cst/CstNode.ts";
-import type { CstNodeInfo } from "../cst/CstNodeInfo.ts";
-import { context } from "./CstParseContext.ts";
+import { CstDetachedNode, CstPeekNode } from "../cst/CstSpecialNode.ts";
+import type { CstNodeConstructor, CstNodeInfo } from "../cst/CstNodeInfo.ts";
+import { getContext, withContext } from "./CstParseContext.ts";
 
 export function node<Node extends CstNode>(
   info: CstNodeInfo<Node>,
   fn: () => Node,
 ): Node {
+  const context = getContext();
   const child = context.beginChild(info);
   try {
-    const node = fn();
+    const node = context === child ? fn() : withContext(child, fn);
     return child.end(node);
   } catch (e) {
     const result = child.endWithError(e);
@@ -21,9 +23,10 @@ export function nullableNode<Node extends CstNode>(
   info: CstNodeInfo<Node>,
   fn: () => Node | null,
 ): Node | null {
+  const context = getContext();
   const child = context.beginChild(info);
   try {
-    const node = fn();
+    const node = context === child ? fn() : withContext(child, fn);
     if (node) {
       return child.end(node);
     } else {
@@ -34,4 +37,41 @@ export function nullableNode<Node extends CstNode>(
     if (!result) throw e;
     return result;
   }
+}
+
+export function detachMap<Node extends CstNode, I, R>(
+  n: CstNodeConstructor<{ value: R } & CstNode, [R]>,
+  nodeFn: (info: CstNodeInfo<Node>, fn: () => I) => R,
+): (info: CstNodeInfo<Node>, fn: () => I) => R {
+  return (info, fn) => node(n, () => new n(nodeFn(info, fn))).value;
+}
+
+export function peek<R>(fn: () => R): R {
+  return node(CstPeekNode<R>, () => new CstPeekNode(fn())).value;
+}
+
+export function peekNode<Node extends CstNode>(info: CstNodeInfo<Node>, fn: () => Node): Node {
+  return node(CstPeekNode<Node>, () => new CstPeekNode(node(info, fn))).value;
+}
+
+export function peekNullable<Node extends CstNode>(
+  info: CstNodeInfo<Node>,
+  fn: () => Node | null,
+): Node | null {
+  return node(CstPeekNode<Node>, () => new CstPeekNode(nullableNode(info, fn))).value;
+}
+
+export function detached<R>(fn: () => R): R {
+  return node(CstDetachedNode<R>, () => new CstDetachedNode(fn())).value;
+}
+
+export function detachedNode<Node extends CstNode>(info: CstNodeInfo<Node>, fn: () => Node): Node {
+  return node(CstDetachedNode<Node>, () => new CstDetachedNode(node(info, fn))).value;
+}
+
+export function detachedNullable<Node extends CstNode>(
+  info: CstNodeInfo<Node>,
+  fn: () => Node | null,
+): Node | null {
+  return node(CstDetachedNode<Node>, () => new CstDetachedNode(nullableNode(info, fn))).value;
 }

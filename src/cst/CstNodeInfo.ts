@@ -5,6 +5,11 @@ import type { CstNode } from "./CstNode.ts";
 
 interface CstNodeCommon<out Node extends CstNode, Params extends unknown[] = any> {
   // TODO
+  default?(): Node;
+
+  nodeFlags?: {
+    vital?: boolean;
+  };
 }
 
 export type CstNodeInfo<Node extends CstNode, Params extends unknown[] = any> =

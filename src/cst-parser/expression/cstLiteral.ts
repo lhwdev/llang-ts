@@ -1,7 +1,12 @@
 import { node } from "../../cst-parse/inlineNode.ts";
 import { code, codeScopes } from "../../cst-parse/intrinsics.ts";
 import { nullableParser, parser } from "../../cst-parse/parser.ts";
-import type { CstExpression } from "../../cst/expression/CstExpression.ts";
+import {
+  CstBooleanLiteral,
+  CstNumberLiteral,
+  CstStringLiteral,
+  CstStringTemplateItem,
+} from "../../cst/expression/CstLiteral.ts";
 import {
   CstLiteral,
   CstStringTemplate,
@@ -12,9 +17,25 @@ import { Tokens } from "../../token/Tokens.ts";
 
 export const cstLiteral = parser(CstLiteral, () => {
   let node;
+  if (node = cstNumberLiteralOrNull()) return node;
+  if (node = cstBooleanLiteralOrNull()) return node;
   if (node = cstStringTemplateOrNull()) return node;
 
-  throw new Error("no match");
+  throw new Error("no match " + code((c) => (c as any).debugNext));
+});
+
+export const cstNumberLiteralOrNull = nullableParser(CstNumberLiteral, () => {
+  const token = code((c) => c.next(Tokens.Literal.Number));
+  if (!token) return null;
+
+  return new CstNumberLiteral(token);
+});
+
+export const cstBooleanLiteralOrNull = nullableParser(CstBooleanLiteral, () => {
+  const token = code((c) => c.next(Tokens.Literal.Boolean));
+  if (!token) return null;
+
+  return new CstBooleanLiteral(token);
 });
 
 export const cstStringTemplateOrNull = nullableParser(CstStringTemplate, () => {
@@ -23,23 +44,25 @@ export const cstStringTemplateOrNull = nullableParser(CstStringTemplate, () => {
 
   const kind = left.kind.kind;
   const scope = codeScopes.stringLiteral(kind);
-  const items: CstExpression[] = [];
+  const items: CstStringTemplateItem[] = [];
   while (true) {
     const next = code(scope, (c) => c.peek());
     if (next.is(Tokens.Literal.String.Text)) {
       const text = node(CstStringTemplateText, () => {
-        const token = code((c) => c.consume(next));
+        const token = code(scope, (c) => c.consume(next));
         return new CstStringTemplateText(token);
       });
       items.push(text);
       continue;
     }
     if (next.is(Tokens.Literal.String.Template.ExprBegin)) {
-      code(scope, (c) => c.consume(next));
-      const expr = 0 as any; // TODO: some method to mark delimited?
-      code(scope, (c) => c.expect(Tokens.Literal.String.Template.ExprEnd));
-
-      items.push(expr);
+      const item = node(CstStringTemplateItem, () => {
+        code(scope, (c) => c.consume(next));
+        const expr = 0 as any; // TODO: some method to mark delimited?
+        code(scope, (c) => c.expect(Tokens.Literal.String.Template.ExprEnd));
+        return expr;
+      });
+      items.push(item);
       continue;
     }
     if (next.is(Tokens.Literal.String.Template.VariableBegin)) {
@@ -52,7 +75,12 @@ export const cstStringTemplateOrNull = nullableParser(CstStringTemplate, () => {
       continue;
     }
     if (next.is(kind.right)) {
-      return new CstStringTemplate(items);
+      code(scope, (c) => c.consume(next));
+      if (items.every((item) => item instanceof CstStringTemplateText)) {
+        return new CstStringLiteral(items);
+      } else {
+        return new CstStringTemplate(items);
+      }
     }
     throw new Error(`unexpected token ${next}`);
   }

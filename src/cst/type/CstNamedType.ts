@@ -4,6 +4,8 @@ import { CstType } from "./CstType.ts";
 import type { CstTypeArguments } from "./CstTypeArguments.ts";
 
 export class CstNamedType extends CstType {
+  declare private $namedType: void;
+
   constructor(
     readonly names: Token<Tokens.Identifier>[],
     readonly typeArguments: CstTypeArguments | null,

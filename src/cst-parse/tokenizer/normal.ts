@@ -2,7 +2,6 @@ import type { Token } from "../../token/Token.ts";
 import { Tokens } from "../../token/Tokens.ts";
 import type { TokenKinds } from "../../token/TokenKinds.ts";
 import { isInherited } from "../../utils/extends.ts";
-import { CstCodeScopeWithHint } from "./CstCodeScopeWithHint.ts";
 import type { CstTokenizerContext } from "./CstTokenizerContext.ts";
 import { parseIdentifierToken } from "./identifier.ts";
 import { parseImplicitToken } from "./implicit.ts";
@@ -14,8 +13,9 @@ import {
 } from "./literal.ts";
 import { parseKeywordToken, parseSoftKeywordToken } from "./modifier.ts";
 import { parseOperatorToken } from "./operator.ts";
+import { CstCodeScope } from "./CstCodeScope.ts";
 
-export class NormalScope extends CstCodeScopeWithHint {
+export class NormalScope extends CstCodeScope {
   constructor(code: CstTokenizerContext) {
     super(code);
   }

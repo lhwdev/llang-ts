@@ -14,7 +14,6 @@
     "lineWidth": 100
   },
   "imports": {
-    "@std/fmt": "jsr:@std/fmt@^1.0.3",
     "unicode-properties": "npm:unicode-properties@^1.4.1"
   }
 }

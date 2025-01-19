@@ -1,32 +1,31 @@
 import { TokenKind } from "./TokenKind.ts";
-
-// these properties are for TS type narrowing: without this, when
-// token is Implicit, if !token.is(Whitespace) then token becomes never. To
-// say, type `this is SomeType` cannot differentiate Whitespace, LineBreak,
-// etc, as they have same shape, even though `instanceof` will say different.
-export type TypeMarker = never;
+import type { TypeMarker } from "../utils/TypeMarker.ts";
+import { type FirstToUppercase, firstToUppercase } from "../utils/strings.ts";
 
 export namespace Tokens {
-  /// Eof: end of file
-  class _Eof extends TokenKind {
-    declare $eof?: TypeMarker;
+  /**
+   * End: end of scope. In root scope, represents EOF(end of file). In specific
+   * scope, represents delimited scope, such as end of group or comma.
+   */
+  class _End extends TokenKind {
+    declare private $eof: void;
   }
-  export const Eof = new _Eof("");
+  export const End = new _End("");
 
   /// Implicit Nodes (ignored)
   export class Implicit extends TokenKind {
-    declare $implicit?: TypeMarker;
+    declare private $implicit: void;
   }
 
   export class Whitespace extends Implicit {
-    declare $whitespace?: TypeMarker;
+    declare private $whitespace: void;
   }
   export class LineBreak extends Implicit {
-    declare $lineBreak?: TypeMarker;
+    declare private $lineBreak: void;
   }
 
   export class Comment extends Implicit {
-    declare $comment?: TypeMarker;
+    declare private $comment: void;
     constructor(readonly kind: Comments.Kind, code: string) {
       super(code);
     }
@@ -130,62 +129,90 @@ export namespace Tokens {
 
   /// Modifiers
   export class Modifier extends TokenKind {
-    declare $modifier?: TypeMarker;
+    declare private $modifier: void;
   }
 
-  export const Keywords = [
+  function modifiers<const K extends string, T extends Modifier>(
+    create: new (code: string) => T,
+    all: K[],
+  ) {
+    const kinds = all.map((k) => new create(k));
+    const codeMap = new Map(kinds.map((k) => [k.code, k]));
+    return {
+      ...Object.fromEntries(
+        all.map((k, index) => [firstToUppercase(k), kinds[index]]),
+      ) as Record<FirstToUppercase<K>, T>,
+
+      all: kinds,
+
+      get(code: string) {
+        return codeMap.get(code) ?? null;
+      },
+    };
+  }
+
+  export class Keyword extends Modifier {
+    declare private $keyword: void;
+  }
+
+  export const Keywords = modifiers(Keyword, [
     "class",
     "fun",
     "val",
     "var",
-  ] as const;
-
-  export class Keyword extends Modifier {
-    declare $keyword?: TypeMarker;
-  }
-
-  export const SoftKeywords = [
-    "public",
-  ] as const;
+    "in",
+    "is",
+    "as",
+  ]);
 
   export class SoftKeyword extends Modifier {
-    declare $softKeyword?: TypeMarker;
+    declare private $softKeyword: void;
   }
+
+  export const SoftKeywords = modifiers(SoftKeyword, [
+    "public",
+  ]);
 
   /// Identifiers
   export class Identifier extends TokenKind {
-    declare $identifier?: TypeMarker;
+    declare private $identifier: void;
   }
 
   /// Operators
   export class Operator extends TokenKind {
-    declare $operator?: TypeMarker;
+    declare private $operator: void;
 
     static Plus = new Operator("+");
     static Minus = new Operator("-");
+
+    static Not = new Operator("!");
 
     static Dot = new Operator(".");
   }
 
   /// Operators - Delimiter: {} [] ()
   export class Delimiter extends Operator {
-    declare $delimiter?: TypeMarker;
+    declare private $delimiter: void;
+
+    kind!: Delimiters;
   }
 
   export namespace Delimiter {
     export class Left extends Delimiter {
-      declare $delimiterLeft?: TypeMarker;
+      declare private $delimiterLeft: void;
 
       static Brace = new Left("{");
       static Bracket = new Left("[");
       static Paren = new Left("(");
+      static AngleBracket = new Left("<");
     }
     export class Right extends Delimiter {
-      declare $delimiterRight?: TypeMarker;
+      declare private $delimiterRight: void;
 
       static Brace = new Right("}");
-      static Bracket = new Left("]");
-      static Paren = new Left(")");
+      static Bracket = new Right("]");
+      static Paren = new Right(")");
+      static AngleBracket = new Right(">");
     }
   }
 
@@ -193,7 +220,10 @@ export namespace Tokens {
     constructor(
       readonly left: Delimiter.Left,
       readonly right: Delimiter.Right,
-    ) {}
+    ) {
+      left.kind = this;
+      right.kind = this;
+    }
 
     static Brace = new Delimiters(Delimiter.Left.Brace, Delimiter.Right.Brace);
     static Bracket = new Delimiters(Delimiter.Left.Bracket, Delimiter.Right.Bracket);
@@ -202,34 +232,38 @@ export namespace Tokens {
 
   /// Operators - Separators: , ;
   export class Separator extends Operator {
-    declare $separator?: TypeMarker;
+    declare private $separator: void;
 
     static Comma = new Separator(",");
     static Semi = new Separator(";");
   }
 
   /// Literals: "hi$ho" 0.23e5
-  export class Literal extends TokenKind {}
+  export class Literal extends TokenKind {
+    declare private $literal: void;
+  }
 
   export namespace Literal {
-    export class String extends Literal {}
+    export class String extends Literal {
+      $stringLiteral?: TypeMarker;
+    }
 
     export namespace String {
       export class Left extends String {
-        declare $stringLeft?: TypeMarker;
+        declare private $stringLeft: void;
 
         kind!: String.Kind;
       }
       export class Right extends String {
-        declare $stringRight?: TypeMarker;
+        declare private $stringRight: void;
 
         kind!: String.Kind;
       }
       export class Text extends String {
-        declare $stringText?: TypeMarker;
+        declare private $stringText: void;
       }
       export class Template extends String {
-        declare $stringTemplate?: TypeMarker;
+        declare private $stringTemplate: void;
 
         static VariableBegin = new Template("$");
         static ExprBegin = new Template("${");
@@ -237,7 +271,7 @@ export namespace Tokens {
       }
 
       export class Escape extends Text {
-        declare $stringEscape?: TypeMarker;
+        declare private $stringEscape: void;
 
         static EscapeChar = "\\";
       }
@@ -259,7 +293,9 @@ export namespace Tokens {
       }
     }
 
-    export class Number extends Literal {}
+    export class Number extends Literal {
+      $numberLiteral?: TypeMarker;
+    }
 
     export namespace Number {
       export class Binary extends Literal {}
@@ -268,6 +304,8 @@ export namespace Tokens {
     }
 
     export class Boolean extends Literal {
+      $booleanLiteral?: TypeMarker;
+
       static True = new Boolean("true");
       static False = new Boolean("false");
     }

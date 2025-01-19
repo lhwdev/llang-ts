@@ -55,6 +55,10 @@ export abstract class CstTokenizerContext {
     return this.match(token.kind);
   }
 
+  abstract snapshot(): unknown;
+
+  abstract restore(to: unknown): void;
+
   abstract peek(offset?: number): CstTokenizerContext;
 
   abstract subscribe(

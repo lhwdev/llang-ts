@@ -1,14 +1,8 @@
 {
   "version": "4",
   "specifiers": {
-    "jsr:@std/fmt@^1.0.3": "1.0.3",
     "npm:@types/unicode-properties@*": "1.3.2",
     "npm:unicode-properties@^1.4.1": "1.4.1"
-  },
-  "jsr": {
-    "@std/fmt@1.0.3": {
-      "integrity": "97765c16aa32245ff4e2204ecf7d8562496a3cb8592340a80e7e554e0bb9149f"
-    }
   },
   "npm": {
     "@types/unicode-properties@1.3.2": {
@@ -40,7 +34,6 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@std/fmt@^1.0.3",
       "npm:unicode-properties@^1.4.1"
     ]
   }

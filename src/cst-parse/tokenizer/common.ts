@@ -1,5 +1,6 @@
 import type { CstTokenizerContext } from "./CstTokenizerContext.ts";
-import { isWord } from "./modifier.ts";
+
+export const isWord = /\w/;
 
 export function parseIdentifierLike(code: CstTokenizerContext): string | null {
   if (!isWord.test(code.current)) return null;

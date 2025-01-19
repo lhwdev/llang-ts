@@ -1,12 +1,14 @@
+import type { CstNode } from "../cst/CstNode.ts";
 import type { Token } from "../token/Token.ts";
 import type { TokenKind } from "../token/TokenKind.ts";
 import { variableWrapper } from "../utils/variableWrapper.ts";
 import type { CstCodeContext } from "./CstCodeContext.ts";
-import { getContext } from "./CstParseContext.ts";
+import { ContextKeys, type ContextValue, getContext } from "./CstParseContext.ts";
+import type { CstParser } from "./parser.ts";
 import type { CstCodeScope, CstCodeScopes } from "./tokenizer/CstCodeScope.ts";
 
 export function code<R>(fn: (code: CstCodeContext) => R): R;
-export function code<R>(scope: CstCodeScope, fn: (code: CstCodeContext) => R): R;
+export function code<R>(scope: CstCodeScope | null, fn: (code: CstCodeContext) => R): R;
 
 /**
  * One invocation of `code` should only parse one token in general. Implicit
@@ -17,16 +19,33 @@ export function code<R>(a: any, b?: any): R {
 }
 
 export namespace code {
-  export function consume<Kind extends TokenKind>(token: Token<Kind>): Token<Kind> {
-    return code((c) => c.consume(token));
+  export function consume<Kind extends TokenKind>(
+    token: Token<Kind>,
+    scope?: CstCodeScope,
+  ): Token<Kind> {
+    return code(scope ?? null, (c) => c.consume(token));
   }
 }
 
-export function eof(): boolean {
-  return code((c) => c.eof());
+export function endOfCode(): boolean {
+  return code((c) => c.end());
 }
 
 export const codeScopes: CstCodeScopes = variableWrapper(() => getContext().codeScopes);
+
+export function provideContext(value: ContextValue<any>): void {
+  getContext().provideContext(value);
+}
+
+export function insertNode<Node extends CstNode>(node: Node): Node {
+  return getContext().insertChild(node);
+}
+
+export function useImplicitNode(
+  parser: CstParser<CstNode, ((...args: any) => CstNode | null)> | null,
+): void {
+  getContext().provideContext(ContextKeys.ImplicitNode.provides(parser));
+}
 
 /**
  * Enforce no implicit nodes are inserted within this node.
@@ -34,5 +53,9 @@ export const codeScopes: CstCodeScopes = variableWrapper(() => getContext().code
  * calling other parser function.
  */
 export function noImplicitNodes() {
-  getContext().noImplicitNodes();
+  useImplicitNode(null);
+}
+
+export function enableDiscard() {
+  getContext().hintType("discardable");
 }

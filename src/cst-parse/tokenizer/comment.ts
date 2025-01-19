@@ -1,4 +1,5 @@
 import type { Token } from "../../token/Token.ts";
+import type { TokenKinds } from "../../token/TokenKinds.ts";
 import { Tokens } from "../../token/Tokens.ts";
 import { CstCodeScope } from "./CstCodeScope.ts";
 import type { CstTokenizerContext } from "./CstTokenizerContext.ts";
@@ -45,7 +46,7 @@ export class CommentScope extends CstCodeScope {
     return null;
   }
 
-  private match(code: CstTokenizerContext): Token {
+  override match(code: CstTokenizerContext, _kind: TokenKinds): Token {
     let token;
     if (token = this.nextCache) {
       this.nextCache = null;
@@ -66,10 +67,6 @@ export class CommentScope extends CstCodeScope {
       offset++;
     }
     return code.create(this.kind.text, offset);
-  }
-
-  override nextAny(): Token {
-    return this.match(this.code);
   }
 
   override peek(): this {

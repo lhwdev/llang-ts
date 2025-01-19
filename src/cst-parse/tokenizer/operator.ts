@@ -15,6 +15,8 @@ function parseOperatorKind(code: CstTokenizerContext): Tokens.Operator | null {
       return Tokens.Delimiter.Left.Bracket;
     case "(":
       return Tokens.Delimiter.Left.Paren;
+    case "<":
+      return Tokens.Delimiter.Left.AngleBracket;
 
     case "}":
       return Tokens.Delimiter.Right.Brace;
@@ -22,11 +24,15 @@ function parseOperatorKind(code: CstTokenizerContext): Tokens.Operator | null {
       return Tokens.Delimiter.Right.Bracket;
     case ")":
       return Tokens.Delimiter.Right.Paren;
+    case ">":
+      return Tokens.Delimiter.Right.AngleBracket;
 
     case "+":
       return Tokens.Operator.Plus;
     case "-":
       return Tokens.Operator.Minus;
+    case "!":
+      return Tokens.Operator.Not;
     case ".":
       return Tokens.Operator.Dot;
 
