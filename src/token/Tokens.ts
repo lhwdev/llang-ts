@@ -245,7 +245,7 @@ export namespace Tokens {
 
   export namespace Literal {
     export class String extends Literal {
-      $stringLiteral?: TypeMarker;
+      declare private $stringLiteral?: TypeMarker;
     }
 
     export namespace String {
@@ -294,7 +294,7 @@ export namespace Tokens {
     }
 
     export class Number extends Literal {
-      $numberLiteral?: TypeMarker;
+      declare private $numberLiteral?: TypeMarker;
     }
 
     export namespace Number {
@@ -304,7 +304,7 @@ export namespace Tokens {
     }
 
     export class Boolean extends Literal {
-      $booleanLiteral?: TypeMarker;
+      declare private $booleanLiteral?: TypeMarker;
 
       static True = new Boolean("true");
       static False = new Boolean("false");

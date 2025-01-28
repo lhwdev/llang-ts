@@ -1,5 +1,6 @@
 import type { Token } from "../token/Token.ts";
 import { Tokens } from "../token/Tokens.ts";
+import type { CstReadonlyArray } from "./CstArray.ts";
 import { CstImplicitNode } from "./CstSpecialNode.ts";
 
 export class CstImplicit extends CstImplicitNode {
@@ -25,7 +26,7 @@ export class CstLineBreak extends CstWs {
 export abstract class CstComment extends CstImplicit {
   declare private $comment: void;
   abstract readonly kind: Tokens.Comments.Kind;
-  abstract readonly content: Token<Tokens.Comment.Content | Tokens.LineBreak>[];
+  abstract readonly content: CstReadonlyArray<Token<Tokens.Comment.Content | Tokens.LineBreak>>;
 }
 
 export class CstBlockComment extends CstComment {
@@ -33,7 +34,7 @@ export class CstBlockComment extends CstComment {
 
   constructor(
     override readonly kind: Tokens.Comments.Kind,
-    override readonly content: Token<Tokens.Comment.Content | Tokens.LineBreak>[],
+    override readonly content: CstReadonlyArray<Token<Tokens.Comment.Content | Tokens.LineBreak>>,
   ) {
     super();
   }
@@ -47,7 +48,7 @@ export class CstLineComment extends CstComment {
   declare private $lineComment: void;
 
   constructor(
-    override readonly content: Token<Tokens.Comment.Content>[],
+    override readonly content: CstReadonlyArray<Token<Tokens.Comment.Content>>,
   ) {
     super();
   }

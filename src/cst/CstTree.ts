@@ -11,8 +11,9 @@ export abstract class CstTree<out Node extends CstNode = CstNode> implements Spa
   abstract node: Node;
   abstract readonly info: CstNodeInfo<Node>;
 
-  abstract readonly source: CstTree;
+  abstract readonly source: CstTree<Node>;
 
+  abstract readonly isRead: boolean;
   abstract readonly isAttached: boolean;
 
   abstract readonly items: readonly CstTreeItem[];

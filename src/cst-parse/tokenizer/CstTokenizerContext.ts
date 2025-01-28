@@ -63,5 +63,5 @@ export abstract class CstTokenizerContext {
 
   abstract subscribe(
     onToken: (tokenizer: CstTokenizerContext, token: Token) => void,
-  ): CstTokenizerContext;
+  ): () => void;
 }

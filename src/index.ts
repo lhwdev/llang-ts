@@ -1,10 +1,16 @@
 import { withContext } from "./cst-parse/CstParseContext.ts";
-import { detachedNode, node, peek } from "./cst-parse/inlineNode.ts";
-import { CstParseContextImpl } from "./cst-parse/internal_old/CstParseContextImpl.ts";
-import { CstStringTokenizerContext } from "./cst-parse/internal_old/CstStringTokenizerContext.ts";
+import { CstParseContextImpl, CstStringTokenizerContext } from "./cst-parse/impl/index.ts";
+import { node, peek } from "./cst-parse/inlineNode.ts";
 import { insertNode } from "./cst-parse/intrinsics.ts";
+import { CodeScopesImpl } from "./cst-parse/tokenizer/scopes.ts";
+import { cstImplicitOrNull } from "./cst-parser/cstImplicit.ts";
 import { cstLiteral } from "./cst-parser/expression/cstLiteral.ts";
-import { CstSimpleCall, CstValueArguments } from "./cst/expression/CstCall.ts";
+import { CstArray } from "./cst/CstArray.ts";
+import {
+  CstSimpleCall,
+  type CstValueArgumentItem,
+  CstValueArguments,
+} from "./cst/expression/CstCall.ts";
 
 (Error as any).stackTraceLimit = Infinity;
 
@@ -13,16 +19,22 @@ const testCode = `"hello, world!" /*this is comment*/ 123`;
 const tokenizer = new CstStringTokenizerContext(testCode);
 const context = new CstParseContextImpl<never>(tokenizer);
 
+context.provideRootContexts({
+  codeScopes: new CodeScopesImpl(tokenizer),
+  implicitNode: cstImplicitOrNull,
+});
+
 withContext(context, () => {
   const str = peek(() => cstLiteral());
-  const whoosh = detachedNode(
+  const whoosh = node(
     CstSimpleCall,
     () =>
       new CstSimpleCall(
         insertNode(str),
         null,
-        node(CstValueArguments, () => new CstValueArguments([])),
+        node(CstValueArguments, () => new CstValueArguments(new CstArray<CstValueArgumentItem>())),
       ),
   );
-  console.log(whoosh);
+  console.log("==========================");
+  console.log(whoosh.dump());
 });

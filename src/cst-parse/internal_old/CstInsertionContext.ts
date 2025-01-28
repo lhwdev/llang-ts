@@ -12,7 +12,7 @@ import { CstGroup } from "./CstGroup.ts";
 import { CstInsertingIntermediateGroup } from "./CstInsertingIntermediateGroup.ts";
 import { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
 import { CstParseContextBase } from "./CstParseContextBase.ts";
-import { debug } from "./debug.ts";
+import { debug } from "../impl/debug.ts";
 
 export function insertChild<Node extends CstNode, Child extends CstNode>(
   into: CstParseContextBase<Node>,

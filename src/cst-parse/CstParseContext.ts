@@ -21,7 +21,6 @@ export function withContext<R>(context: CstParseContext<any>, fn: () => R): R {
     return fn();
   } finally {
     baseContext = previous;
-    (context as any).flushLog();
   }
 }
 
@@ -40,6 +39,7 @@ export interface CstParseContext<out Node extends CstNode = CstNode> {
   hintType(type: CstNodeHintType): void;
 
   provideContext(value: ContextValue<any>): void;
+  resolveContext<T>(key: ContextKey<T>): ContextValue<T>;
 
   beforeEnd(node: Node): CstTree<Node>;
 
@@ -51,16 +51,22 @@ export interface CstParseContext<out Node extends CstNode = CstNode> {
 }
 
 export class ContextKey<T> {
+  declare private $ContextKey: void;
+
   constructor(readonly name?: string) {}
 
   provides(value: T): ContextValue<T> {
-    return { key: this, value };
+    return new ContextValue(this, value);
   }
 }
 
-export interface ContextValue<T> {
-  key: ContextKey<T>;
-  value: T;
+export class ContextValue<T> {
+  declare private $ContextValue: void;
+
+  constructor(
+    readonly key: ContextKey<T>,
+    readonly value: T,
+  ) {}
 }
 
 export namespace ContextKeys {
@@ -71,4 +77,5 @@ export namespace ContextKeys {
   export const IsImplicit = new ContextKey<boolean>("IsImplicit");
 
   export const CodeScopes = new ContextKey<CstCodeScopes>("CodeScopes");
+  export const CodeScope = new ContextKey<CstCodeScope>("CodeScope");
 }

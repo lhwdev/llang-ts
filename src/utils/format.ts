@@ -38,6 +38,7 @@ interface Fmt extends Formats {
   (options?: Options): (strings: TemplateStringsArray, ...args: any[]) => string;
 
   entry(strings: TemplateStringsArray, ...args: any[]): Entry;
+  toEntry(input: Entry | unknown): Entry;
 
   symbol(name: unknown): Entry;
   parameter(name: unknown): Entry;
@@ -68,6 +69,8 @@ export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
     }
     return result;
   },
+
+  toEntry: mapInput,
 
   symbol(name: unknown) {
     return this.yellow(`${name}`);
@@ -125,8 +128,8 @@ export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
             return new ValueEntry(fn(`${value}`, ...other));
           }
         } else {
-          return (str: TemplateStringsArray, ...args: any) =>
-            new StyleEntry((str) => fn(str, ...args), fmt.entry(str, ...args));
+          return (str: TemplateStringsArray, ...innerArgs: any) =>
+            new StyleEntry((str) => fn(str, ...args), fmt.entry(str, ...innerArgs));
         }
       }]),
   ) as any as Formats,
@@ -146,7 +149,7 @@ export function format(value: any, options?: Options): string {
 }
 
 export function formatClass(value: any, options?: Options): string {
-  return classToString(value, { ...options, handleObject: classToStringEntry });
+  return classToString(value, { ...options, handleObject: (v) => classToStringEntry(v, true) });
 }
 
 /// Format Symbols & Constants
@@ -189,25 +192,7 @@ export namespace format {
   export const className = formatSymbolDecorator(FormatClassName, true);
   export const objectEntries = formatSymbolDecorator(FormatObjectEntries, true);
 
-  export const print = formatSymbolDecorator(
-    ToFormatString,
-    false,
-    (fn) =>
-      function (this: any, ...args: any) {
-        try {
-          return fn.call(this, ...args);
-        } catch (e) {
-          throw new Error(
-            `while printing ${
-              typeof this === "object" && this
-                ? this.constructor.name
-                : Object.prototype.toString.call(this)
-            }`,
-            { cause: e },
-          );
-        }
-      },
-  );
+  export const print = formatSymbolDecorator(ToFormatString, false);
 }
 
 export const ObjectStack: object[] = [];
@@ -474,6 +459,17 @@ export const FormatEntries = {
   object: ObjectEntry,
   trailing: TrailingEntry,
   style: StyleEntry,
+
+  join(entries: Entry[], separator: Entry = new ValueEntry(", ")) {
+    const list = new ListEntry();
+    let first = true;
+    for (const entry of entries) {
+      if (!first) list.push(separator);
+      list.push(entry);
+      first = false;
+    }
+    return list;
+  },
 };
 
 export type FormatEntry = Entry;
@@ -630,11 +626,14 @@ export function objectLiteralToStringEntry(
   try {
     const important = Options.important(data);
     for (const [key, value] of formatEntries(data)) {
+      const k = fmt.toEntry(key);
       const item = new ListEntry();
-      item.push(new ValueEntry(`${important ? brightWhite(key) : key}${dim(between)}`));
+
+      item.push(important ? new StyleEntry(brightWhite, k) : k);
+      item.push(new ValueEntry(dim(between)));
       item.push(valueToColorStringEntry(value));
       item.push(new TrailingEntry(","));
-      result.push(mapItem ? mapItem(key, value, item) : item, [true, true]);
+      result.push(mapItem ? mapItem(`${key}`, value, item) : item, [true, true]);
     }
   } finally {
     ObjectStack.pop();
@@ -642,7 +641,7 @@ export function objectLiteralToStringEntry(
   return newGroup(result);
 }
 
-export function formatEntries(data: object): readonly [any, any][] {
+export function formatEntries(data: object): ReadonlyArray<readonly [any, any]> {
   if (FormatObjectEntries in data) {
     return data[FormatObjectEntries] as any;
   }

@@ -1,5 +1,7 @@
+import type { CstNode } from "../../cst/CstNode.ts";
 import { CstRootNode } from "../../cst/CstRootNode.ts";
 import type { ContextKey, ContextValue } from "../CstParseContext.ts";
+import type { CstGroup } from "./CstGroup.ts";
 import type { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
 import { CstIntermediateNode } from "./CstIntermediateNode.ts";
 
@@ -11,9 +13,22 @@ export class CstIntermediateRoot extends CstIntermediateNode {
     stub.contextualNode = stub;
     super(stub, CstRootNode);
     this.parent = this;
+    this.contextualNode = this;
   }
 
-  override resolveContextOrNull<T>(_key: ContextKey<T>): ContextValue<T> | null {
-    return null;
+  override parentForPop(): CstIntermediateGroup {
+    throw new Error("cannot end root group");
+  }
+
+  override resolveContextOrNull<T>(key: ContextKey<T>): ContextValue<T> | null {
+    return this.resolveContextOnSelf(key);
+  }
+
+  override beforeEnd<Node extends CstNode>(_node: Node): CstGroup<Node> {
+    throw new Error("cannot end root group");
+  }
+
+  override end<Node extends CstNode>(_node: Node): Node {
+    throw new Error("cannot end root group");
   }
 }

@@ -20,6 +20,14 @@ export class CstDetachedNode<Value> extends CstSpecialNode {
   }
 }
 
+export class CstInsertedNode<Node extends CstNode> extends CstSpecialNode {
+  declare private $special_inserted: void;
+
+  constructor(readonly value: Node) {
+    super();
+  }
+}
+
 export class CstImplicitNode extends CstSpecialNode {
   declare private $special_implicit: void;
 }

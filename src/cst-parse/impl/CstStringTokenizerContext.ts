@@ -73,13 +73,9 @@ export class CstStringTokenizerContext extends CstTokenizerContext {
     return new CstStringTokenizerContext(this.code, this.offset + offset, true, []);
   }
 
-  override subscribe(onToken: (tokenizer: CstTokenizerContext, token: Token) => void) {
-    return new CstStringTokenizerContext(
-      this.code,
-      this.offset,
-      this.isPeek,
-      [...this.onToken, onToken],
-    );
+  override subscribe(onToken: (tokenizer: CstTokenizerContext, token: Token) => void): () => void {
+    this.onToken.push(onToken);
+    return () => this.onToken.splice(this.onToken.indexOf(onToken), 1);
   }
 
   override toString() {

@@ -1,14 +1,15 @@
 import type { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
+import { CstConcreteGroup } from "./CstConcreteGroup.ts";
 import type { CstGroup } from "./CstGroup.ts";
 import { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
 
 export class CstIntermediateNode extends CstIntermediateGroup {
-  override createChild(info: CstNodeInfo<any>): CstIntermediateGroup {
+  protected override createChild(info: CstNodeInfo<any>): CstIntermediateGroup {
     return new CstIntermediateNode(this, info);
   }
 
-  override createGroup<Node extends CstNode>(node: Node): CstGroup<Node> {
-    throw new Error("Method not implemented.");
+  protected override createGroup<Node extends CstNode>(node: Node): CstGroup<Node> {
+    return new CstConcreteGroup(this, node);
   }
 }

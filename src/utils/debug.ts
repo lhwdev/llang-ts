@@ -5,21 +5,28 @@ import { GetSpanSymbol, type Spanned } from "../token/Spanned.ts";
 import { TokenKind } from "../token/TokenKind.ts";
 import {
   classToStringEntry,
+  fmt,
   FormatEntries,
   formatFor,
   formatRaw,
   objectLiteralToStringEntry,
 } from "./format.ts";
 import { type FormatEntry, formatFn } from "./format.ts";
-import { CstGroup } from "../cst-parse/internal_old/CstGroup.ts";
+import { CstTree } from "../cst/CstTree.ts";
 
 export function dumpNode(node: CstNode): string {
   return formatFn(null, () => dumpNodeEntry(node));
 }
 
-export function dumpNodeEntries(node: CstNode): readonly [any, any][] {
+export function dumpNodeEntries(node: CstNode): ReadonlyArray<readonly [any, any]> {
   let group = node.tree;
-  if (group instanceof CstGroup && group.shadowedGroups) {
+  if (!group || !(group instanceof CstTree)) {
+    return [
+      ["$formatter_error", fmt.red`"no 'tree' property for CstNode, tree=${group}"`],
+      ...Object.entries(node),
+    ];
+  }
+  if (group.shadowedGroups) {
     group = group.shadowedGroups.at(-1)!;
   }
   return formatFor(node, () => {
@@ -56,65 +63,135 @@ export function dumpNodeEntries(node: CstNode): readonly [any, any][] {
       other.set(key, value);
     }
 
+    const errors = [];
+
     // sort spanned and add missing items
-    let span: Pick<Span, "start" | "end"> = group[GetSpanSymbol];
-    const sortedSpan = Array.from(
+    const span = group[GetSpanSymbol];
+    const treeSpans = group.allSpans;
+    const propertySpans = Array.from(
       spannedMap.entries()
-        .map(([key, spanned]) => [key, spanned, spanned[GetSpanSymbol]] as const),
-    ).sort((a, b) => b[2].start - a[2].start);
-    const allSpans = group.allSpans;
+        .map(([key, spanned]) => [key, spanned] as const),
+    );
 
-    if (allSpans.length > 0) {
-      const start = allSpans[0][GetSpanSymbol].start;
-      const end = allSpans.at(-1)![GetSpanSymbol].end;
-      if (start !== span.start || end != span.end) {
-        console.error(
-          `dump(${node.constructor.name}): span misaligned inferred=${start}..<${end} actual=${span}`,
-        );
-        console.error(allSpans);
-      }
-      span = { start, end };
-    }
+    let treeIndex = 0;
+    let propertyIndex = 0;
+    const spans: (readonly [string, Spanned])[] = [];
+    if (treeSpans.length || propertySpans.length) {
+      const mapTree = (
+        spanned: Spanned,
+        index: number,
+      ): readonly [string, Spanned] => [`_tree_${index}`, spanned];
 
-    const spans: [string, Spanned][] = [];
-    let tempSpansIndex = 0;
-    let offset = span.start;
+      let offset = Math.min(
+        treeSpans.at(0)?.[GetSpanSymbol].start ?? Infinity,
+        propertySpans.at(0)?.[1][GetSpanSymbol].start ?? Infinity,
+      );
+      const discontinuous = [];
+      const skipped = new Set<Spanned>();
 
-    let sortedIndex = 0;
-    let allSpansIndex = 0;
-    while (offset < span.end) {
-      if (sortedIndex < sortedSpan.length) {
-        const [key, value, span] = sortedSpan[sortedIndex];
-        if (offset >= span.start) {
-          if (offset == span.start) {
-            spans.push([key, value]);
-            offset = span.end;
-          }
-          sortedIndex++;
+      const addSpan = (item: readonly [string, Spanned]) => {
+        const spanned = item[1];
+        const span = spanned[GetSpanSymbol];
+        if (span.start !== offset) discontinuous.push(offset);
+        spans.push(item);
+        skipped.delete(spanned);
+        offset = span.end;
+      };
+
+      let count = 0;
+      while (true) {
+        if (count++ > 10) break;
+        const property = propertySpans.at(propertyIndex);
+        const tree = treeSpans.at(treeIndex);
+
+        if (!property && !tree) break;
+        if (!tree) {
+          addSpan(property!);
+          propertyIndex++;
+          continue;
+        }
+        if (!property) {
+          addSpan(mapTree(tree!, treeIndex));
+          treeIndex++;
           continue;
         }
 
-        // offset < span.start: find other spanned from tree
+        const propertySpan = property[1][GetSpanSymbol];
+        if (propertySpan.start < offset) {
+          propertyIndex++;
+          skipped.add(property[1]);
+          continue;
+        }
+        const treeSpan = tree[GetSpanSymbol];
+        if (treeSpan.start < offset) {
+          treeIndex++;
+          skipped.add(tree);
+          continue;
+        }
+
+        if (propertySpan.start === treeSpan.start) {
+          if (propertySpan.start !== offset) discontinuous.push(offset);
+          if (propertySpan.end === treeSpan.end) {
+            addSpan(property);
+            propertyIndex++;
+            treeIndex++;
+            continue;
+          }
+          if (propertySpan.end < treeSpan.end) {
+            throw new Error("TODO");
+          }
+          // propertySpan.end > treeSpan.end
+          // in case of SpanGroup, property may span over multiple tree spans
+          addSpan(property);
+          propertyIndex++;
+
+          let treeOffset = offset;
+          while (treeOffset < propertySpan.end) {
+            const tree = treeSpans.at(treeIndex++);
+            if (!tree) break;
+            const span = tree[GetSpanSymbol];
+            if (treeOffset !== span.start) discontinuous.push(treeOffset);
+            treeOffset = span.end;
+          }
+          if (treeOffset > propertySpan.end) {
+            discontinuous.push(treeOffset);
+            treeIndex--;
+          }
+        } else {
+          if (propertySpan.start < treeSpan.start) {
+            if (propertySpan.start !== offset) discontinuous.push(offset);
+            addSpan(property);
+            propertyIndex++;
+          } else {
+            if (treeSpan.start !== offset) discontinuous.push(offset);
+            addSpan(mapTree(tree, treeIndex));
+            treeIndex++;
+          }
+        }
       }
 
-      // we have missing ones
-      while (
-        allSpansIndex < allSpans.length && allSpans[allSpansIndex][GetSpanSymbol].start < offset
-      ) {
-        allSpansIndex++;
+      if (skipped.size) {
+        errors.push(fmt.entry`skipped ${fmt.toEntry(skipped.values().toArray().join())}`);
       }
-      const spanned = allSpans[allSpansIndex];
-      const span = spanned[GetSpanSymbol];
-      if (span.start !== offset) {
-        throw new Error("whoosh mismatch");
+      if (discontinuous.length) {
+        errors.push(fmt.entry`spans discontinuous at ${fmt.toEntry(discontinuous.join(", "))}`);
       }
-      spans.push([`_tree_${tempSpansIndex++}`, spanned]);
-      offset = span.end;
-      allSpansIndex++;
     }
-    if (offset != span.end) throw new Error("offset != span.end");
+
+    // Check if span is continuous
+    if (spans.length && !span.invalid) {
+      const start = spans.at(0)![1][GetSpanSymbol].start;
+      if (start !== -1 && span.start !== start) {
+        errors.push(fmt.entry`span.start ${span.start} != allSpans[0].span.start ${start}`);
+      }
+      const end = spans.at(-1)![1][GetSpanSymbol].end;
+      if (end !== -1 && span.end !== end) {
+        errors.push(fmt.entry`span.end ${span.end} != allSpans[0].span.end ${end}`);
+      }
+    }
 
     return [
+      ...errors.length ? [[fmt.red`_error`, fmt.red(FormatEntries.join(errors))] as const] : [],
       ...other.entries(),
       ...spans,
     ];
@@ -127,7 +204,7 @@ export function dumpNodeEntry(node: CstNode): FormatEntry {
     important: (value) => value instanceof CstNode,
     handleObject: (value) => {
       if (value instanceof CstNode) return dumpNodeEntry(value);
-      if (value instanceof CstGroup) return dumpNodeEntry(value.node);
+      if (value instanceof CstTree) return dumpNodeEntry(value.node);
       return classToStringEntry(value, true);
     },
   }, () => {

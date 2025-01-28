@@ -4,6 +4,7 @@ import { CstNode } from "../CstNode.ts";
 import type { CstTypeArguments } from "../type/CstTypeArguments.ts";
 import { CstExpression } from "./CstExpression.ts";
 import type { CstLambdaExpression } from "./CstFunctionExpression.ts";
+import type { CstReadonlyArray } from "../CstArray.ts";
 
 export class CstCall extends CstExpression {
   declare private $call: void;
@@ -53,7 +54,7 @@ export class CstValueArguments extends CstNode {
   declare private $valueArguments: void;
 
   constructor(
-    readonly items: [name: Token<Tokens.Identifier> | null, value: CstExpression][],
+    readonly items: CstReadonlyArray<CstValueArgumentItem>,
   ) {
     super();
   }
@@ -62,12 +63,18 @@ export class CstValueArguments extends CstNode {
   get(index: number): CstExpression | null;
   get(index: string | number): CstExpression | null {
     if (typeof index === "number") {
-      return this.items.at(index)?.[1] ?? null;
+      return this.items.at(index)?.value ?? null;
     } else {
-      for (const [key, value] of this.items) {
-        if (key?.code === index) return value;
+      for (const { name, value } of this.items) {
+        if (name?.code === index) return value;
       }
       return null;
     }
+  }
+}
+
+export class CstValueArgumentItem extends CstNode {
+  constructor(readonly name: Token<Tokens.Identifier> | null, readonly value: CstExpression) {
+    super();
   }
 }

@@ -19,14 +19,14 @@ export function subscribeToken<R>(onToken: (token: Token) => void, block: () => 
 
 export class CstCodeContextImpl extends CstCodeContext {
   constructor(
-    tokenizer: CstTokenizerContext,
+    readonly tokenizer: CstTokenizerContext,
   ) {
     super();
 
-    this.tokenizer = tokenizer.subscribe((_, token) => this.onToken(token));
+    this.subscribeHandle = tokenizer.subscribe((_, token) => this.onToken(token));
   }
 
-  readonly tokenizer: CstTokenizerContext;
+  private subscribeHandle: () => void;
   scope?: CstCodeScope | null;
 
   private peekBuffer: [CstCodeScope, Token] | null = null;
@@ -133,5 +133,9 @@ export class CstCodeContextImpl extends CstCodeContext {
     const state = to as { tokenizer: unknown };
     this.tokenizer.restore(state.tokenizer);
     this.peekBuffer = null;
+  }
+
+  override close(): void {
+    this.subscribeHandle();
   }
 }

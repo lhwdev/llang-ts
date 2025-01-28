@@ -23,4 +23,6 @@ export abstract class CstCodeContext {
 
   abstract snapshot(): unknown;
   abstract restore(to: unknown): void;
+
+  abstract close(): void;
 }

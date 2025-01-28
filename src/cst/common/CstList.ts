@@ -1,15 +1,16 @@
 import { CstNode } from "../CstNode.ts";
+import type { CstReadonlyArray } from "../CstArray.ts";
 import type { CstNodeConstructor } from "../CstNodeInfo.ts";
 
 export interface CstList<Item extends CstNode> extends CstNode {
-  readonly items: Item[];
+  readonly items: CstReadonlyArray<Item>;
 }
 
 export function CstList<Item extends CstNode>(
   _itemType: CstNodeConstructor<Item>,
-): CstNodeConstructor<CstList<Item>, [items: Item[]]> {
+): CstNodeConstructor<CstList<Item>, [items: CstReadonlyArray<Item>]> {
   const info = class extends CstNode {
-    constructor(readonly items: Item[]) {
+    constructor(readonly items: CstReadonlyArray<Item>) {
       super();
     }
   };

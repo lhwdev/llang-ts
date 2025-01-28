@@ -6,6 +6,8 @@ import { GetSpanSymbol, type Spanned } from "./Spanned.ts";
  * time, which stands for empty node.
  */
 export class Span implements Spanned {
+  static Empty = new Span(-1, -1);
+
   constructor(
     readonly start: number,
     readonly end: number,
@@ -21,6 +23,10 @@ export class Span implements Spanned {
 
   get [GetSpanSymbol](): Span {
     return this;
+  }
+
+  equals(other: Span) {
+    return this.start === other.start && this.end === other.end;
   }
 
   toString() {

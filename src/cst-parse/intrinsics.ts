@@ -3,7 +3,7 @@ import type { Token } from "../token/Token.ts";
 import type { TokenKind } from "../token/TokenKind.ts";
 import { variableWrapper } from "../utils/variableWrapper.ts";
 import type { CstCodeContext } from "./CstCodeContext.ts";
-import { ContextKeys, type ContextValue, getContext } from "./CstParseContext.ts";
+import { type ContextKey, ContextKeys, type ContextValue, getContext } from "./CstParseContext.ts";
 import type { CstParser } from "./parser.ts";
 import type { CstCodeScope, CstCodeScopes } from "./tokenizer/CstCodeScope.ts";
 
@@ -33,12 +33,16 @@ export function endOfCode(): boolean {
 
 export const codeScopes: CstCodeScopes = variableWrapper(() => getContext().codeScopes);
 
+export function insertNode<Node extends CstNode>(node: Node): Node {
+  return getContext().insertChild(node);
+}
+
 export function provideContext(value: ContextValue<any>): void {
   getContext().provideContext(value);
 }
 
-export function insertNode<Node extends CstNode>(node: Node): Node {
-  return getContext().insertChild(node);
+export function useContext<T>(key: ContextKey<T>): T {
+  return getContext().resolveContext(key).value;
 }
 
 export function useImplicitNode(
