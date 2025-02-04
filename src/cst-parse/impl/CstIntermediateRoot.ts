@@ -8,7 +8,7 @@ import { CstIntermediateNode } from "./CstIntermediateNode.ts";
 export class CstIntermediateRoot extends CstIntermediateNode {
   override readonly parent: CstIntermediateRoot;
 
-  constructor() {
+  constructor(readonly nodeInstance: typeof CstIntermediateNode | null) {
     const stub = { spanEnd: 0 } as CstIntermediateGroup;
     stub.contextualNode = stub;
     super(stub, CstRootNode);
@@ -22,6 +22,31 @@ export class CstIntermediateRoot extends CstIntermediateNode {
 
   override resolveContextOrNull<T>(key: ContextKey<T>): ContextValue<T> | null {
     return this.resolveContextOnSelf(key);
+  }
+
+  private mappedInstances = new Set<new (...args: any) => CstIntermediateGroup>();
+
+  protected override childInstance<Ctor extends new (...args: any) => CstIntermediateGroup>(
+    type: Ctor,
+  ): Ctor {
+    if (!this.nodeInstance) return type;
+    if (type as any === CstIntermediateNode) return this.nodeInstance as any;
+
+    if (this.mappedInstances.has(type)) return type;
+
+    let current = type;
+    while (current) {
+      const prototype = Object.getPrototypeOf(current);
+      if (prototype === CstIntermediateNode) {
+        Object.setPrototypeOf(current, this.nodeInstance);
+        break;
+      } else {
+        current = prototype;
+      }
+    }
+
+    this.mappedInstances.add(type);
+    return type;
   }
 
   override beforeEnd<Node extends CstNode>(_node: Node): CstGroup<Node> {

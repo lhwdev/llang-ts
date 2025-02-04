@@ -1,5 +1,5 @@
 import type { CstNode } from "../cst/CstNode.ts";
-import { CstDetachedNode, CstPeekNode } from "../cst/CstSpecialNode.ts";
+import { CstDetachedNode, CstPeekNode } from "./CstSpecialNode.ts";
 import type { CstNodeConstructor, CstNodeInfo } from "../cst/CstNodeInfo.ts";
 import { getContext, withContext } from "./CstParseContext.ts";
 
@@ -9,6 +9,8 @@ export function node<Node extends CstNode>(
 ): Node {
   const context = getContext();
   const child = context.beginChild(info);
+  const skip = child.skipping();
+  if (skip) return skip;
   try {
     const node = context === child ? fn() : withContext(child, fn);
     return child.end(node);
@@ -25,6 +27,9 @@ export function nullableNode<Node extends CstNode>(
 ): Node | null {
   const context = getContext();
   const child = context.beginChild(info);
+  const skip = child.skipping();
+  if (skip) return skip;
+  child.hintType("nullable");
   try {
     const node = context === child ? fn() : withContext(child, fn);
     if (node) {
@@ -32,6 +37,25 @@ export function nullableNode<Node extends CstNode>(
     } else {
       return child.endWithError(null);
     }
+  } catch (e) {
+    const result = child.endWithError(e);
+    if (!result) throw e;
+    return result;
+  }
+}
+
+export function discardableNode<Node extends CstNode>(
+  info: CstNodeInfo<Node>,
+  fn: () => Node,
+): Node | null {
+  const context = getContext();
+  const child = context.beginChild(info);
+  const skip = child.skipping();
+  if (skip) return skip;
+  child.hintType("discardable");
+  try {
+    const node = context === child ? fn() : withContext(child, fn);
+    return child.end(node);
   } catch (e) {
     const result = child.endWithError(e);
     if (!result) throw e;

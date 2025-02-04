@@ -73,16 +73,14 @@ export const cstImplicitOrNull = nullableParser(CstImplicit, () => {
   throw new Error(`unreachable: not well-known TokenType ${token.kind}`);
 });
 
-export const CstImplicitList = CstList(CstImplicit);
-
-export const cstImplicitList = parser(CstImplicitList, () => {
+export const cstImplicitList = parser(CstList<CstImplicit>, () => {
   const list = new CstArray<CstImplicit>();
   while (true) {
     const node = cstImplicitOrNull();
     if (!node) break;
     list.push(node);
   }
-  return new CstImplicitList(list);
+  return new CstList(list);
 });
 
 export const cstImplicitNoLineBreak = () => {

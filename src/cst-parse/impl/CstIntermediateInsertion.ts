@@ -1,21 +1,21 @@
 import type { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
-import { CstInsertedNode } from "../../cst/CstSpecialNode.ts";
+import { CstInsertedNode } from "../CstSpecialNode.ts";
 import type { CstTreeItem } from "../../cst/CstTree.ts";
 import { CstTree } from "../../cst/CstTree.ts";
 import { ContextKeys } from "../CstParseContext.ts";
 import type { CstGroup } from "./CstGroup.ts";
 import { CstInsertedGroup, CstInsertedGroupRoot } from "./CstInsertedGroup.ts";
-import { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
+import { CstIntermediateNode } from "./CstIntermediateNode.ts";
 
 // Should not use getContext(); current is not updated
 
-export class CstIntermediateInsertion extends CstIntermediateGroup {
+export class CstIntermediateInsertion extends CstIntermediateNode {
   index: number = 0;
   source?: CstNode;
 
   protected override createChild(info: CstNodeInfo<any>): CstIntermediateInsertion {
-    return new CstIntermediateInsertion(this, info);
+    return new (this.childInstance(CstIntermediateInsertion))(this, info);
   }
 
   endInsertion<Node extends CstNode>(source: Node): Node {
@@ -34,7 +34,7 @@ export class CstIntermediateInsertion extends CstIntermediateGroup {
         throw new Error("unexpected intermediate child");
       }
       // TODO: problem with shadow exists?
-      return child.withSelf(() => child.endInsertion(item.node).tree);
+      return child.withSelf(() => (child.skipping() ?? child.endInsertion(item.node)).tree);
     } else { // item instanceof Token
       return this.code(
         this.resolveContext(ContextKeys.CodeScope).value,
@@ -50,11 +50,11 @@ export class CstIntermediateInsertion extends CstIntermediateGroup {
   }
 }
 
-export class CstIntermediateInsertionRoot extends CstIntermediateGroup {
+export class CstIntermediateInsertionRoot extends CstIntermediateNode {
   source!: CstNode;
 
   protected override createChild(info: CstNodeInfo<any>): CstIntermediateInsertion {
-    return new CstIntermediateInsertion(this, info);
+    return new (this.childInstance(CstIntermediateInsertion))(this, info);
   }
 
   insertRoot<Node extends CstNode>(source: Node): Node {
@@ -64,7 +64,9 @@ export class CstIntermediateInsertionRoot extends CstIntermediateGroup {
       throw new Error("unexpected child");
     }
 
-    const inserted = new CstInsertedNode(child.withSelf(() => child.endInsertion(source)));
+    const inserted = new CstInsertedNode(
+      child.withSelf(() => child.skipping<Node>() ?? child.endInsertion(source)),
+    );
     return this.end(inserted).value;
   }
 

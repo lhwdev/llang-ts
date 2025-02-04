@@ -1,4 +1,4 @@
-import { detached, detachedNode, peek } from "../../cst-parse/inlineNode.ts";
+import { peek, peekNode } from "../../cst-parse/inlineNode.ts";
 import { code, endOfCode } from "../../cst-parse/intrinsics.ts";
 import { unexpectedTokenError } from "../../cst-parse/parseError.ts";
 import { nullableParser, parser } from "../../cst-parse/parser.ts";
@@ -33,6 +33,9 @@ import { cstReference } from "./cstReference.ts";
  * - unary ops
  * - group; ()
  * - invocation; CstCall (), CstLambdaCall {}, CstGetCall []
+ *
+ * Control flow graph of, occurrence of these operators / nodes:
+ * 1.
  */
 
 /**
@@ -131,7 +134,7 @@ function cstExpressionInner() {
   const operators: CstOperator[] = [];
 
   const makeOperation = (operator: CstOperator) =>
-    detachedNode(CstOperation, () => {
+    peekNode(CstOperation, () => {
       if (operator instanceof CstBinaryOperator) {
         const right = stack.pop();
         const left = stack.pop();

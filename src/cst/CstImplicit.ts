@@ -1,7 +1,7 @@
 import type { Token } from "../token/Token.ts";
 import { Tokens } from "../token/Tokens.ts";
 import type { CstReadonlyArray } from "./CstArray.ts";
-import { CstImplicitNode } from "./CstSpecialNode.ts";
+import { CstImplicitNode } from "../cst-parse/CstSpecialNode.ts";
 
 export class CstImplicit extends CstImplicitNode {
   declare private $implicit: void;

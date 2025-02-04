@@ -7,6 +7,10 @@ import { type ContextKey, ContextKeys, type ContextValue, getContext } from "./C
 import type { CstParser } from "./parser.ts";
 import type { CstCodeScope, CstCodeScopes } from "./tokenizer/CstCodeScope.ts";
 
+export function memoize<T>(calculate: () => T, dependencies?: unknown[]): T {
+  return getContext().memoize(calculate, dependencies);
+}
+
 export function code<R>(fn: (code: CstCodeContext) => R): R;
 export function code<R>(scope: CstCodeScope | null, fn: (code: CstCodeContext) => R): R;
 

@@ -24,7 +24,7 @@ export function withContext<R>(context: CstParseContext<any>, fn: () => R): R {
   }
 }
 
-export type CstNodeHintType = "discardable";
+export type CstNodeHintType = "discardable" | "nullable";
 
 export interface CstParseContext<out Node extends CstNode = CstNode> {
   /// Code parsing
@@ -35,8 +35,11 @@ export interface CstParseContext<out Node extends CstNode = CstNode> {
 
   /// Node management
   beginChild<Child extends CstNode>(info: CstNodeInfo<Child>): CstParseContext<Child>;
+  skipping(): Node | null;
 
   hintType(type: CstNodeHintType): void;
+
+  memoize<T>(calculate: () => T, dependencies?: unknown[]): T;
 
   provideContext(value: ContextValue<any>): void;
   resolveContext<T>(key: ContextKey<T>): ContextValue<T>;

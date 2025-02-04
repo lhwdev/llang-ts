@@ -1,4 +1,4 @@
-import { CstNode } from "./CstNode.ts";
+import { CstNode } from "../cst/CstNode.ts";
 
 export class CstSpecialNode extends CstNode {
   declare private $special: void;
@@ -20,6 +20,10 @@ export class CstDetachedNode<Value> extends CstSpecialNode {
   }
 }
 
+export class CstImplicitNode extends CstSpecialNode {
+  declare private $special_implicit: void;
+}
+
 export class CstInsertedNode<Node extends CstNode> extends CstSpecialNode {
   declare private $special_inserted: void;
 
@@ -28,6 +32,10 @@ export class CstInsertedNode<Node extends CstNode> extends CstSpecialNode {
   }
 }
 
-export class CstImplicitNode extends CstSpecialNode {
-  declare private $special_implicit: void;
+export class CstConstraintNodeRoot<Value> extends CstSpecialNode {
+  declare private $special_repeat: void;
+
+  constructor(readonly value: Value) {
+    super();
+  }
 }

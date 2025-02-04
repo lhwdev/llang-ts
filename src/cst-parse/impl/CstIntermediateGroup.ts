@@ -1,6 +1,6 @@
 import type { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
-import { CstImplicitNode } from "../../cst/CstSpecialNode.ts";
+import { CstImplicitNode } from "../CstSpecialNode.ts";
 import { Span } from "../../token/Span.ts";
 import { GetSpanSymbol, type Spanned } from "../../token/Spanned.ts";
 import type { Token } from "../../token/Token.ts";
@@ -8,7 +8,7 @@ import { dim, strikethrough } from "../../utils/colors.ts";
 import { isInherited } from "../../utils/extends.ts";
 import { fmt, formatClass, type FormatEntry } from "../../utils/format.ts";
 import type { CstCodeContext } from "../CstCodeContext.ts";
-import type { ContextValue, CstNodeHintType } from "../CstParseContext.ts";
+import type { ContextValue, CstNodeHintType, CstParseContext } from "../CstParseContext.ts";
 import type { ContextKey } from "../CstParseContext.ts";
 import { ContextKeys, getContext } from "../CstParseContext.ts";
 import { nullableNode } from "../inlineNode.ts";
@@ -17,15 +17,20 @@ import type { CstCodeScope, CstCodeScopes } from "../tokenizer/CstCodeScope.ts";
 import { type CstCodeContextImpl, subscribeToken } from "./CstCodeContextImpl.ts";
 import { CstGroup, type CstGroupItem } from "./CstGroup.ts";
 import type { CstParseContextImpl } from "./CstParseContextImpl.ts";
+import { detailedParseError } from "./errors.ts";
+import type { CstParseContextParent } from "./CstGroupParseContext.ts";
+
+export const EmptySlot = Symbol("EmptySlot");
 
 export abstract class CstIntermediateGroup {
   readonly spanStart: number;
   spanEnd: number;
   declare snapshot?: unknown; // tokenizer(offset = spanStart)
 
+  declare flagNullable?: true;
   declare flagDiscardable?: true;
 
-  items: CstGroupItem[] = [];
+  readonly items: CstGroupItem[] = [];
   declare allowImplicit?: boolean;
   declare isImplicit?: boolean;
 
@@ -144,8 +149,15 @@ export abstract class CstIntermediateGroup {
     }
   }
 
+  /// Metadata & Slot
+
   hintType(hint: CstNodeHintType) {
     switch (hint) {
+      case "nullable": {
+        this.flagNullable = true;
+        this.ensureSnapshotExists();
+        break;
+      }
       case "discardable": {
         this.flagDiscardable = true;
         this.ensureSnapshotExists();
@@ -154,6 +166,14 @@ export abstract class CstIntermediateGroup {
       default:
         throw new Error(`unknown hint type ${hint}`);
     }
+  }
+
+  getSlot(): unknown {
+    return EmptySlot;
+  }
+
+  updateSlot<T>(value: T): T {
+    return value;
   }
 
   /// Code parsing
@@ -201,6 +221,27 @@ export abstract class CstIntermediateGroup {
     }
   }
 
+  restoreToPrevious() {
+    if (!this.snapshot) {
+      throw new Error("snapshot does not exist for group");
+    }
+    this.c.restore(this.snapshot);
+  }
+
+  /// Self management
+
+  skipping<Node extends CstNode>(): Node | null {
+    return null;
+  }
+
+  /**
+   * Not guaranteed to be called for all new groups.
+   */
+  // deno-lint-ignore no-unused-vars
+  createUniqueContext(parent: CstParseContextParent): CstParseContext | null {
+    return null;
+  }
+
   /// Children management
 
   beginChild(info: CstNodeInfo<any>): CstIntermediateGroup {
@@ -209,10 +250,9 @@ export abstract class CstIntermediateGroup {
     // (parent.add is handled by CstParseContext)
     this.ensureInitialized();
 
-    const special = this.beginSpecialNode(info);
-    let child: CstIntermediateGroup;
+    let child: CstIntermediateGroup | null;
 
-    const kind = special ? "Special Node" : this.isImplicit ? dim("Implicit Node") : "Node";
+    const kind = this.isImplicit ? dim("Implicit Node") : "Node";
     debug`${
       fmt.lazy(() =>
         fmt`${
@@ -224,19 +264,24 @@ export abstract class CstIntermediateGroup {
       )
     }`;
 
-    if (special) {
-      child = special;
-      return special;
+    if (child = this.beginSpecialNode(info)) {
+      return child;
     }
 
     this.handleImplicit();
 
-    child = this.createChild(info);
+    child = this.createSpecialChild(info) ?? this.createChild(info);
     // this.intermediateChildren.push(child);
     return child;
   }
 
   beginSpecialNode(info: CstNodeInfo<any>): CstIntermediateGroup | null {
+    throw new Error(
+      `implemented by index.ts to avoid circular imports, args=${info}`,
+    );
+  }
+
+  createSpecialChild(info: CstNodeInfo<any>): CstIntermediateGroup | null {
     throw new Error(
       `implemented by index.ts to avoid circular imports, args=${info}`,
     );
@@ -262,13 +307,21 @@ export abstract class CstIntermediateGroup {
 
   protected abstract createChild(info: CstNodeInfo<any>): CstIntermediateGroup;
 
+  protected childInstance<Ctor extends new (...args: any) => CstIntermediateGroup>(
+    type: Ctor,
+  ): Ctor {
+    return this.contextualNode.childInstance(type);
+  }
+
   beforeEnd<Node extends CstNode>(node: Node): CstGroup<Node> {
     if (this.group) {
-      throw new Error(
-        "Creating multiple CstNode inside one node() call is not allowed. " +
-          "For example, `new CstSimpleCall(new CstReference('hi'), [], [])` is not allowed. " +
-          "To do this, use separate node() call, like `new CstSimpleCall(node(() => new CstReference('hi')), [], [])`.",
-      );
+      throw detailedParseError`
+        Creating multiple CstNode inside one node() call is not allowed.
+        For example, ${fmt.code`new CstSimpleCall(new CstReference('hi'), [], [])`} is not allowed.
+        To do this, use separate node() call, like ${
+        fmt.code(`new CstSimpleCall(node(() => new CstReference('hi')), [], [])`)
+      }.
+      `;
     }
 
     const group = this.createGroup(node);
@@ -280,10 +333,11 @@ export abstract class CstIntermediateGroup {
     let group = this.group as CstGroup<Node> | undefined;
     if (group) {
       if (group.node !== node) {
-        console.error("you should return CstNode that is newly created inside parser.");
-        console.error(fmt`- ${fmt.brightYellow`previously created`}: ${group.node}, ${group}`);
-        console.error(fmt`- ${fmt.brightYellow`given`}: ${node}`);
-        throw new Error("you should return CstNode that is newly created inside parser.");
+        throw detailedParseError`
+          you should return CstNode that is newly created inside parser.
+          - ${fmt.brightYellow`previously created`}: ${group.node}
+          - ${fmt.brightYellow`given`}: ${node}
+        `;
       }
     } else {
       // Shadowing node: such as `node(() => node(() => new CstNode))`
@@ -297,12 +351,17 @@ export abstract class CstIntermediateGroup {
       //   throw new Error("cannot shadow node created by unknown parser");
       // }
       const items = group.items;
-      if (items.length > 1 || items.at(0) !== childGroup) {
-        console.error("items =", items);
-        console.error("childGroup =", childGroup);
-        throw new Error(
-          "to return node as-is from parser, you should call maximum of only one group.",
-        );
+      if (items.length > 1) {
+        throw detailedParseError`
+          to return node as-is from parser, you should call maximum of only one parser.
+          - ${fmt.brightYellow`tree.items`}: ${items}
+        `;
+      }
+      if (items.at(0) !== childGroup) {
+        throw detailedParseError`
+          to return node as-is from parser, you should call maximum of only one parser.
+          - ${fmt.brightYellow`tree.items`}: ${items}
+        `;
       }
       node.tree = group;
       // group.allSpans = childGroup.allSpans;
@@ -339,9 +398,10 @@ export abstract class CstIntermediateGroup {
   endWithError(error: unknown | null): CstNode | null {
     this.error = error;
     if (this.snapshot) {
-      this.c.restore(this.snapshot);
+      this.restoreToPrevious();
     } else {
-      if (!error && this.spanEnd != this.spanStart) {
+      if (this.flagNullable && this.spanEnd != this.spanStart) {
+        if (this.flagDiscardable) throw new Error("<- never happens?");
         throw new Error(
           "nullableNode should call enableDiscard() to " +
             "consume any node then return null.",

@@ -18,8 +18,8 @@ import { debug } from "../impl/debug.ts";
 import { dim, strikethrough } from "../../utils/colors.ts";
 import type { CstGroup } from "./CstGroup.ts";
 import { isInherited } from "../../utils/extends.ts";
-import { CstDetachedNode, CstSpecialNode } from "../../cst/CstSpecialNode.ts";
-import { CstPeekNode } from "../../cst/CstSpecialNode.ts";
+import { CstDetachedNode, CstSpecialNode } from "../CstSpecialNode.ts";
+import { CstPeekNode } from "../CstSpecialNode.ts";
 
 export class CstParseContextImpl<out Node extends CstNode> implements CstParseContext<Node> {
   readonly tokenizer: CstTokenizerContext;
