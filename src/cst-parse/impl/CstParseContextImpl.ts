@@ -16,15 +16,15 @@ export class CstParseContextImpl<Node extends CstNode> extends CstGroupParseCont
   current: CstIntermediateGroup;
 
   constructor(readonly tokenizer: CstTokenizerContext) {
+    super();
     const c = new CstCodeContextImpl(tokenizer);
     const debug = {
-      context: {} as CstParseContextImpl<Node>,
+      context: this,
       lines: [] as [number, FormatEntry][],
       log(entry: FormatEntry) {
-        this.lines.push([this.context.current.debugDepth, entry]);
+        this.context.current.debugLog(entry);
       },
     };
-    super();
     this.parent = { c, debug };
     this.current = new CstIntermediateRoot(null);
   }

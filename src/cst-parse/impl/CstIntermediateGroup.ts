@@ -1,12 +1,12 @@
-import type { CstNode } from "../../cst/CstNode.ts";
+import { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
-import { CstImplicitNode } from "../CstSpecialNode.ts";
+import { CstImplicitNode, CstSpecialNode } from "../CstSpecialNode.ts";
 import { Span } from "../../token/Span.ts";
 import { GetSpanSymbol, type Spanned } from "../../token/Spanned.ts";
 import type { Token } from "../../token/Token.ts";
 import { dim, strikethrough } from "../../utils/colors.ts";
 import { isInherited } from "../../utils/extends.ts";
-import { fmt, formatClass, type FormatEntry } from "../../utils/format.ts";
+import { fmt, formatClass, FormatEntries, type FormatEntry } from "../../utils/format.ts";
 import type { CstCodeContext } from "../CstCodeContext.ts";
 import type { ContextValue, CstNodeHintType, CstParseContext } from "../CstParseContext.ts";
 import type { ContextKey } from "../CstParseContext.ts";
@@ -21,6 +21,7 @@ import { detailedParseError } from "./errors.ts";
 import type { CstParseContextParent } from "./CstGroupParseContext.ts";
 
 export const EmptySlot = Symbol("EmptySlot");
+export const DebugName = Symbol("DebugName");
 
 export abstract class CstIntermediateGroup {
   readonly spanStart: number;
@@ -41,6 +42,7 @@ export abstract class CstIntermediateGroup {
   declare error?: unknown | null;
 
   declare debugInitialized?: boolean;
+  declare debugName?: string;
 
   constructor(
     readonly parent: CstIntermediateGroup,
@@ -76,13 +78,22 @@ export abstract class CstIntermediateGroup {
     return this.parent === this ? 0 : this.parent.debugDepth + 1;
   }
 
-  declare private debugLines?: FormatEntry[];
+  get debugLocation(): string[] {
+    if (this.parent === this) return ["root"];
+    const list = this.parent.debugLocation;
+    list.push(this.info.name);
+    return list;
+  }
+
+  get debugLocationString(): string {
+    return fmt.join(this.debugLocation.map((l) => fmt.brightWhite(l)), fmt.gray(" > ")).toString();
+  }
+
+  declare private debugLines?: [depth: number, line: FormatEntry, isDim?: boolean][];
 
   debugLog(line: FormatEntry) {
     if (!this.debugLines) this.debugLines = [];
-    this.debugLines.push(line);
-    const indent = "  ".repeat(this.debugDepth);
-    console.log(indent + line.toString().replace("\n", "\n" + indent));
+    this.debugLines.push([this.debugDepth, line]);
   }
 
   /// Internal-most tree management functions
@@ -97,7 +108,7 @@ export abstract class CstIntermediateGroup {
     if (span.start !== this.spanEnd) {
       throw new Error(
         "span not continuous: " +
-          fmt`inserting ${item} into group(span=${new Span(this.spanStart, this.spanEnd)})`,
+          fmt`inserting ${item} into group(span=${new Span(this.spanStart, this.spanEnd)})`.s,
       );
     }
     this.spanEnd = span.end;
@@ -125,7 +136,7 @@ export abstract class CstIntermediateGroup {
   resolveContext<T>(key: ContextKey<T>): ContextValue<T> {
     const result = this.resolveContextOrNull(key);
     if (!result) {
-      throw new Error(fmt`Cannot resolve context value for ${key}`);
+      throw new Error(fmt`Cannot resolve context value for ${key}`.s);
     }
     return result;
   }
@@ -153,19 +164,36 @@ export abstract class CstIntermediateGroup {
 
   hintType(hint: CstNodeHintType) {
     switch (hint) {
-      case "nullable": {
-        this.flagNullable = true;
-        this.ensureSnapshotExists();
+      case "nullable":
+        this.markNullable();
         break;
-      }
-      case "discardable": {
-        this.flagDiscardable = true;
-        this.ensureSnapshotExists();
+
+      case "discardable":
+        this.markDiscardable();
         break;
+
+      default: {
+        if (typeof hint === "object") {
+          if (DebugName in hint) {
+            this.debugName = `${hint[DebugName]}`;
+            return;
+          }
+        }
+        throw new Error(
+          fmt`unknown hint type ${hint} for ${fmt.raw(this.debugLocationString)}`.s,
+        );
       }
-      default:
-        throw new Error(`unknown hint type ${hint}`);
     }
+  }
+
+  markNullable() {
+    this.flagNullable = true;
+    this.ensureSnapshotExists();
+  }
+
+  markDiscardable() {
+    this.flagDiscardable = true;
+    this.ensureSnapshotExists();
   }
 
   getSlot(): unknown {
@@ -253,16 +281,38 @@ export abstract class CstIntermediateGroup {
     let child: CstIntermediateGroup | null;
 
     const kind = this.isImplicit ? dim("Implicit Node") : "Node";
-    debug`${
-      fmt.lazy(() =>
-        fmt`${
-          fmt.cyan(() => child?.error !== undefined ? strikethrough(kind) : kind)
-        } ${info} ➜  ` +
-        (child?.error !== undefined
+    debug.raw(fmt.lazy((c) => {
+      const kindEntry = child?.error !== undefined
+        ? fmt.bgBlack(fmt.cyan(strikethrough(kind)))
+        : fmt.cyan(kind);
+      let name;
+      const original = `${info.name}`;
+      const originalStyled = isInherited(info, CstSpecialNode)
+        ? fmt.rgb8(original, 182)
+        : fmt.raw(original);
+      if (child?.debugName) {
+        const debug = child.debugName;
+        if (info === CstNode) {
+          name = fmt.italic(debug);
+        } else if (debug.startsWith(original)) {
+          name = fmt`${originalStyled}${fmt.italic(debug.slice(original.length))}`;
+        } else {
+          name = fmt`${originalStyled} ${fmt.italic(debug)}`;
+        }
+      } else {
+        name = originalStyled;
+      }
+      let result;
+      if (isInherited(info, CstImplicitNode)) {
+        result = fmt`${child?.group?.node ?? fmt.raw`?`}`;
+      } else {
+        result = child?.error !== undefined
           ? child.error === null ? fmt.dim`null` : fmt`${fmt.red(`${child.error}`)}`
-          : "")
-      )
-    }`;
+          : fmt``;
+      }
+
+      return fmt`${c.dim ? fmt.dim(kindEntry) : kindEntry} ${name} ➜  ${result}`.s;
+    }));
 
     if (child = this.beginSpecialNode(info)) {
       return child;
@@ -270,7 +320,13 @@ export abstract class CstIntermediateGroup {
 
     this.handleImplicit();
 
-    child = this.createSpecialChild(info) ?? this.createChild(info);
+    child = this.createSpecialChild(info);
+    if (!child) {
+      if (info instanceof CstSpecialNode) {
+        throw new Error(`unknown special node ${info.name}`);
+      }
+      child = this.createChild(info);
+    }
     // this.intermediateChildren.push(child);
     return child;
   }
@@ -316,7 +372,8 @@ export abstract class CstIntermediateGroup {
   beforeEnd<Node extends CstNode>(node: Node): CstGroup<Node> {
     if (this.group) {
       throw detailedParseError`
-        Creating multiple CstNode inside one node() call is not allowed.
+        Creating multiple CstNode inside one node() call is not allowed; tried to create \\
+        ${node.constructor} while ${this.group.info} exists.
         For example, ${fmt.code`new CstSimpleCall(new CstReference('hi'), [], [])`} is not allowed.
         To do this, use separate node() call, like ${
         fmt.code(`new CstSimpleCall(node(() => new CstReference('hi')), [], [])`)
@@ -373,11 +430,11 @@ export abstract class CstIntermediateGroup {
       }
     }
 
-    debug`${fmt.dim`end ${this.info} ➜ `} ${
+    debug`${fmt.dim`end ${this.debugName ? fmt.raw(this.debugName) : this.info} ➜ `} ${
       fmt.lazy(() =>
         group.shadowedGroups && group.node === group.children.at(0)?.node
           ? fmt.italic`${fmt.rgb8(group.node.constructor.name, 19)}(${fmt.dim`same`})`
-          : fmt`${node}`
+          : fmt`${node}`.s
       )
     }`;
 
@@ -400,17 +457,20 @@ export abstract class CstIntermediateGroup {
     if (this.snapshot) {
       this.restoreToPrevious();
     } else {
-      if (this.flagNullable && this.spanEnd != this.spanStart) {
-        if (this.flagDiscardable) throw new Error("<- never happens?");
-        throw new Error(
-          "nullableNode should call enableDiscard() to " +
-            "consume any node then return null.",
-        );
+      if (this.flagNullable || this.flagDiscardable) {
+        throw new Error("never happens");
       }
+      // if (this.flagNullable && this.spanEnd != this.spanStart) {
+      //   throw new Error(
+      //     "nullableNode should call enableDiscard() to " +
+      //       "consume any node then return null.",
+      //   );
+      // }
     }
-    this.endSelfWithError(error);
 
     if (error !== null) debug`${fmt.dim("endWithError")} ${fmt.red(`${error}`)}`;
+
+    this.endSelfWithError(error);
 
     return null;
   }
@@ -420,18 +480,36 @@ export abstract class CstIntermediateGroup {
   }
 
   endChild(child: CstGroup, from: CstIntermediateGroup) {
-    this.endChildCommon(from);
+    this.endChildCommon(child, from, true);
     this.addItem(child);
+    this.allowImplicit = true;
   }
 
-  // deno-lint-ignore no-unused-vars
   endChildWithError(error: unknown | null, from: CstIntermediateGroup) {
-    this.endChildCommon(from);
+    this.endChildCommon({ error }, from, true);
   }
 
-  // deno-lint-ignore no-unused-vars
-  endChildCommon(from: CstIntermediateGroup) {
+  endChildCommon(
+    result: CstGroup | { error: unknown | null },
+    from: CstIntermediateGroup,
+    // deno-lint-ignore no-unused-vars
+    added: boolean,
+  ) {
     // do nothing
+
+    const lines = from.debugLines;
+    if (lines && !from.isImplicit) {
+      if (this.parent === this) {
+        lines.forEach(([depth, line, isDim]) => {
+          const indent = "  ".repeat(depth);
+          if (isDim) line = new FormatEntries.context(["dim", true] as any, line);
+          console.log(indent + line.toString().replaceAll("\n", "\n" + indent));
+        });
+        return;
+      }
+      if (!(result instanceof CstGroup)) lines.forEach((line) => line[2] = true);
+      this.debugLines = (this.debugLines ?? []).concat(lines);
+    }
   }
 
   protected abstract createGroup<Node extends CstNode>(node: Node): CstGroup<Node>;

@@ -57,9 +57,8 @@ export function discardableNode<Node extends CstNode>(
     const node = context === child ? fn() : withContext(child, fn);
     return child.end(node);
   } catch (e) {
-    const result = child.endWithError(e);
-    if (!result) throw e;
-    return result;
+    // TODO
+    return child.endWithError(e);
   }
 }
 

@@ -3,6 +3,7 @@ import type { CstNode } from "../cst/CstNode.ts";
 import type { CstNodeInfo } from "../cst/CstNodeInfo.ts";
 import { node, nullableNode } from "./inlineNode.ts";
 import { type CstParseContext, withContext } from "./CstParseContext.ts";
+import { ParseError } from "./parseError.ts";
 
 abstract class CstParserClass<Node extends CstNode, Fn extends (...args: any[]) => any> {
   abstract info: CstNodeInfo<Node>;
@@ -24,6 +25,15 @@ abstract class CstParserClass<Node extends CstNode, Fn extends (...args: any[]) 
     ...args: Parameters<Fn>
   ): ReturnType<Fn> {
     return this.surround(() => extra(() => this.invokeRaw(...args)));
+  }
+
+  nonNull(...args: Parameters<Fn>): NonNullable<ReturnType<Fn>> {
+    // todo: remove nullable flag
+    const node = this.invoke(...args);
+    if (node === null || node === undefined) {
+      throw new ParseError("result is null");
+    }
+    return node;
   }
 }
 
@@ -47,15 +57,13 @@ export function rawParser<Params extends any[], Node extends CstNode, R>(
   raw: (...args: Params) => R,
   impl: (...args: Params) => R = (...args: Params): R => surround(() => raw(...args)),
 ): CstParser<Node, ((...args: Params) => R)> {
-  return Object.assign(
-    impl,
-    new class extends CstParser<Node, ((...args: Params) => R)> {
-      override info = info;
-      override invoke = impl;
-      override invokeRaw = raw;
-      override surround = surround;
-    }(),
-  );
+  const parser = new class extends CstParser<Node, ((...args: Params) => R)> {
+    override info = info;
+    override invoke = impl;
+    override invokeRaw = raw;
+    override surround = surround;
+  }();
+  return Object.setPrototypeOf(Object.assign(impl, parser), Object.getPrototypeOf(parser));
 }
 
 export function parser<Params extends any[], Node extends CstNode>(

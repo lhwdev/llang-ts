@@ -1,10 +1,11 @@
 import type { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
 import type { CstTree, CstTreeItem } from "../../cst/CstTree.ts";
-import type { Span } from "../../token/Span.ts";
+import { Span } from "../../token/Span.ts";
 import { GetSpanSymbol, type Spanned } from "../../token/Spanned.ts";
 import type { Token } from "../../token/Token.ts";
 import { fmt } from "../../utils/format.ts";
+import { detailedParseError } from "../impl/errors.ts";
 import type { CstCodeScope } from "../tokenizer/CstCodeScope.ts";
 import { CstGroup } from "./CstGroup.ts";
 
@@ -41,11 +42,10 @@ export class CstIntermediateGroup {
 
   protected extendSpan(span: Span, debugHint?: any) {
     if (this.spanEnd !== span.start) {
-      throw new Error(
-        fmt`span not continuous: previous=${this.spanStart} to ${this.spanEnd}, current=${
-          debugHint ?? span
-        }`,
-      );
+      throw detailedParseError`
+        Span not continuous; previous=${new Span(this.spanStart, this.spanEnd)}, current= \\
+        ${debugHint ?? span}
+      `;
     }
     this.spanEnd = span.end;
   }
@@ -66,7 +66,7 @@ export class CstIntermediateGroup {
     const previous = this.allItems.at(-1)?.[GetSpanSymbol];
     if ((previous?.end ?? this.spanStart) !== token.span.start) {
       throw new Error(
-        fmt`token.span not continuous: previous=${previous}, current=${token}`,
+        fmt`token.span not continuous: previous=${previous}, current=${token}`.s,
       );
     }
     session.tokens.push(token);

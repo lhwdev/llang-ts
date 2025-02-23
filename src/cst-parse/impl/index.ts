@@ -34,10 +34,10 @@ CstIntermediateGroup.prototype.createSpecialChild = function (info) {
     case CstInsertedNode:
       return new (this.childInstance(CstIntermediateInsertionRoot))(this, info);
     case CstConstraintNodeRoot:
-      return new (this.childInstance(CstIntermediateConstraintRoot))(this, info as any);
+      return new (this.childInstance(CstIntermediateConstraintRoot))(this, info);
 
     default:
-      throw new Error(`unknown special node ${info.name}`);
+      return null;
   }
 };
 

@@ -24,7 +24,7 @@ export abstract class CstTokenizerContext {
     const token = this.ifMatch(kind);
     if (!token) {
       throw new Error(
-        fmt`nothing matched ${this.span(kind.code.length)}; expected ${kind}`,
+        fmt`nothing matched ${this.span(kind.code.length)}; expected ${kind}`.s,
       );
     }
     return token;

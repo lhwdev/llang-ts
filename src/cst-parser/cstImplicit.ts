@@ -1,9 +1,10 @@
-import { code, codeScopes, noImplicitNodes } from "../cst-parse/intrinsics.ts";
+import { code, codeScopes, useImplicitNode } from "../cst-parse/intrinsics.ts";
 import { nullableParser, parser } from "../cst-parse/parser.ts";
 import { CstList } from "../cst/common/CstList.ts";
 import {
   CstBlockComment,
   CstImplicit,
+  CstImplicitList,
   CstLineBreak,
   CstLineComment,
   CstWhitespace,
@@ -18,7 +19,7 @@ export const cstWhitespace = parser(CstWhitespace, () => {
 });
 
 export const cstImplicitOrNull = nullableParser(CstImplicit, () => {
-  noImplicitNodes();
+  useImplicitNode(null);
 
   const token = code((c) => c.next(Tokens.Implicit));
   if (!token) return null;
@@ -73,14 +74,14 @@ export const cstImplicitOrNull = nullableParser(CstImplicit, () => {
   throw new Error(`unreachable: not well-known TokenType ${token.kind}`);
 });
 
-export const cstImplicitList = parser(CstList<CstImplicit>, () => {
+export const cstImplicitList = parser(CstImplicitList, () => {
   const list = new CstArray<CstImplicit>();
   while (true) {
     const node = cstImplicitOrNull();
     if (!node) break;
     list.push(node);
   }
-  return new CstList(list);
+  return new CstImplicitList(list);
 });
 
 export const cstImplicitNoLineBreak = () => {

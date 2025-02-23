@@ -56,14 +56,8 @@ export function useImplicitNode(
 }
 
 /**
- * Enforce no implicit nodes are inserted within this node.
- * Should be called before accessing this context, like using {@link code} or
- * calling other parser function.
+ * @deprecated discardable mode will be enabled by default in nullable node.
  */
-export function noImplicitNodes() {
-  useImplicitNode(null);
-}
-
 export function enableDiscard() {
   getContext().hintType("discardable");
 }

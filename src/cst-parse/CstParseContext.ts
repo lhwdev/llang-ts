@@ -24,7 +24,7 @@ export function withContext<R>(context: CstParseContext<any>, fn: () => R): R {
   }
 }
 
-export type CstNodeHintType = "discardable" | "nullable";
+export type CstNodeHintType = "discardable" | "nullable" | object;
 
 export interface CstParseContext<out Node extends CstNode = CstNode> {
   /// Code parsing

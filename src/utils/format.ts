@@ -8,6 +8,7 @@ import {
   italic,
   magenta,
   red,
+  rgb8,
   stripAnsiCode,
   yellow,
 } from "./colors.ts";
@@ -34,22 +35,24 @@ type Formats = {
   [Key in keyof AllFormats]: FormatFn<AllFormats[Key]>;
 };
 interface Fmt extends Formats {
-  (strings: TemplateStringsArray, ...args: any[]): string;
-  (options?: Options): (strings: TemplateStringsArray, ...args: any[]) => string;
+  (strings: TemplateStringsArray, ...args: any[]): Entry;
+  (options?: Options): (strings: TemplateStringsArray, ...args: any[]) => Entry;
 
-  entry(strings: TemplateStringsArray, ...args: any[]): Entry;
-  toEntry(input: Entry | unknown): Entry;
+  raw(input: Entry | unknown): Entry;
 
   symbol(name: unknown): Entry;
   parameter(name: unknown): Entry;
-  code(name: unknown): Entry;
-  lazy(fn: () => Entry | string): Entry;
+  code(content: unknown): Entry;
+  lazy(fn: (context: FormatContext) => Entry | string): Entry;
+
+  join(entries: Entry[], separator?: Entry): Entry;
 
   classLike(name: string, content: Entry | string): Entry;
 }
 
 function mapInput(input: Entry | unknown): Entry {
   if (input instanceof Entry) return input;
+  if (typeof input === "symbol") return new ValueEntry(input.toString());
   return new ValueEntry(`${input}`);
 }
 
@@ -61,16 +64,7 @@ export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
       formatRaw(a, () => fmtTemplate(strings, ...args));
   }
 }, {
-  entry(strings: TemplateStringsArray, ...args: any[]) {
-    const result = new ListEntry();
-    for (let i = 0; i < strings.length; i++) {
-      if (i != 0) result.push(valueToColorStringEntry(args[i - 1]));
-      result.push(new ValueEntry(strings[i]));
-    }
-    return result;
-  },
-
-  toEntry: mapInput,
+  raw: mapInput,
 
   symbol(name: unknown) {
     return this.yellow(`${name}`);
@@ -81,11 +75,15 @@ export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
   },
 
   code(content: unknown) {
-    return new ValueEntry(`${content}`);
+    return new ValueEntry(rgb8(`${content}`, 110));
   },
 
-  lazy(fn: () => Entry | string) {
-    return new LazyEntry(() => mapInput(fn()));
+  lazy(fn: (context: FormatContext) => Entry | string) {
+    return new LazyEntry((context) => mapInput(fn(context)));
+  },
+
+  join(entries: Entry[], separator: Entry = new ValueEntry(", ")): Entry {
+    return FormatEntries.join(entries, separator);
   },
 
   classLike(name: string, content: Entry | string) {
@@ -109,7 +107,7 @@ export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
         if (fn.length === 1) {
           const strings = args[0];
           if (Array.isArray(strings) && typeof strings.at(0) === "string" && "raw" in strings) {
-            return new StyleEntry(fn, fmt.entry(strings as TemplateStringsArray, ...args.slice(1)));
+            return new StyleEntry(fn, fmt(strings as TemplateStringsArray, ...args.slice(1)));
           }
         }
         if (args.length === fn.length) {
@@ -129,19 +127,19 @@ export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
           }
         } else {
           return (str: TemplateStringsArray, ...innerArgs: any) =>
-            new StyleEntry((str) => fn(str, ...args), fmt.entry(str, ...innerArgs));
+            new StyleEntry((str) => fn(str, ...args), fmt(str, ...innerArgs));
         }
       }]),
   ) as any as Formats,
 });
 
-function fmtTemplate(strings: TemplateStringsArray, ...args: any[]): string {
-  let result = "";
+function fmtTemplate(strings: TemplateStringsArray, ...args: any[]): Entry {
+  const list = new ListEntry();
   for (let i = 0; i < strings.length; i++) {
-    if (i != 0) result += format(args[i - 1]);
-    result += strings[i];
+    if (i !== 0) list.push(valueToColorStringEntry(args[i - 1]));
+    list.push(new ValueEntry(strings[i]));
   }
-  return result;
+  return list;
 }
 
 export function format(value: any, options?: Options): string {
@@ -156,7 +154,7 @@ export function formatClass(value: any, options?: Options): string {
 export const ToFormatString = Symbol("ToFormatString"); // function: () => string
 export const FormatObjectEntries = Symbol("FormatObjectEntries"); // value: get () => string
 export const FormatClassName = Symbol("FormatClassName"); // value: get () => string
-export const MaxWidth = 80;
+export const MaxWidth = 100;
 export const Indent = "  ";
 
 /// Format decorators
@@ -209,11 +207,15 @@ type Options = Partial<typeof Options>;
 
 const TooLongError = {};
 
+export interface FormatContext extends Record<string, any> {}
+
 class OneLineOutput {
   constructor(
     public result = "",
     public length = 0,
   ) {}
+
+  context: FormatContext = {} as any;
 
   print(str: string) {
     this.result += str;
@@ -237,6 +239,8 @@ class MultiLineOutput {
     public result: string = "",
     public last: boolean | null = false,
   ) {}
+
+  context: FormatContext = {} as any;
 
   print(line: string, [left, right]: [boolean | null, boolean | null] = [null, null]) {
     const newLine = this.last || left;
@@ -270,6 +274,10 @@ abstract class Entry {
   abstract multiLine(output: MultiLineOutput): void;
 
   toString() {
+    return format(this);
+  }
+
+  get s() {
     return format(this);
   }
 }
@@ -309,12 +317,42 @@ class GroupEntry extends Entry {
   }
 }
 
+class ContextEntry<Key extends keyof FormatContext = keyof FormatContext> extends Entry {
+  constructor(readonly context: [Key, FormatContext[Key]], readonly entry: Entry) {
+    super();
+  }
+
+  withContext<T extends { context: FormatContext }>(output: T, block: (output: T) => void) {
+    const [key, value] = this.context;
+    const c = output.context;
+    const previous = c[key];
+    c[key] = value;
+    try {
+      block(output);
+    } finally {
+      c[key] = previous;
+    }
+  }
+
+  override oneLine(output: OneLineOutput): void {
+    this.withContext(output, (output) => {
+      this.entry.oneLine(output);
+    });
+  }
+
+  override multiLine(output: MultiLineOutput): void {
+    this.withContext(output, (output) => {
+      this.entry.multiLine(output);
+    });
+  }
+}
+
 class ValueEntry extends Entry {
   constructor(readonly text: string) {
     super();
   }
 
-  override oneLine(output: OneLineOutput) {
+  override oneLine(output: OneLineOutput): void {
     output.print(this.text);
   }
   override multiLine(output: MultiLineOutput): void {
@@ -323,15 +361,17 @@ class ValueEntry extends Entry {
 }
 
 class LazyEntry extends Entry {
-  constructor(readonly calculate: () => Entry) {
+  constructor(
+    readonly calculate: (context: FormatContext) => Entry,
+  ) {
     super();
   }
 
   override oneLine(output: OneLineOutput) {
-    this.calculate().oneLine(output);
+    this.calculate(output.context).oneLine(output);
   }
   override multiLine(output: MultiLineOutput): void {
-    this.calculate().multiLine(output);
+    this.calculate(output.context).multiLine(output);
   }
 }
 
@@ -455,6 +495,7 @@ class StyleEntry extends Entry {
 export const FormatEntries = {
   value: ValueEntry,
   group: GroupEntry,
+  context: ContextEntry,
   list: ListEntry,
   object: ObjectEntry,
   trailing: TrailingEntry,
@@ -569,7 +610,7 @@ export function classToStringEntry(
     ? `${data[FormatClassName]}`
     : data.constructor?.name ?? "Object";
   if (typeof name !== "string") {
-    throw new Error(fmt`${fmt.parameter("name")} is ${name}; expected string`);
+    throw new Error(fmt`${fmt.parameter("name")} is ${name}; expected string`.s);
   }
 
   if (fallback) {
@@ -626,7 +667,7 @@ export function objectLiteralToStringEntry(
   try {
     const important = Options.important(data);
     for (const [key, value] of formatEntries(data)) {
-      const k = fmt.toEntry(key);
+      const k = fmt.raw(key);
       const item = new ListEntry();
 
       item.push(important ? new StyleEntry(brightWhite, k) : k);
@@ -645,7 +686,14 @@ export function formatEntries(data: object): ReadonlyArray<readonly [any, any]> 
   if (FormatObjectEntries in data) {
     return data[FormatObjectEntries] as any;
   }
-  const entries = Object.entries(data);
+  const keys = [...Object.getOwnPropertyNames(data), ...Object.getOwnPropertySymbols(data)];
+  const entries: (readonly [any, any])[] = [];
+  for (const key of keys) {
+    const prop = Object.getOwnPropertyDescriptor(data, key);
+    if (!prop) continue;
+    if ("value" in prop) entries.push([key, prop.value]);
+    else if ("get" in prop) entries.push([key, prop.get]);
+  }
   (entries as any)[FormatObjectEntries] = entries;
   return entries;
 }

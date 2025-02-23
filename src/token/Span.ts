@@ -30,6 +30,6 @@ export class Span implements Spanned {
   }
 
   toString() {
-    return fmt.classLike("Span", fmt.entry`${this.start}..<${this.end}`).toString();
+    return fmt.classLike("Span", fmt`${this.start}..<${this.end}`).s;
   }
 }

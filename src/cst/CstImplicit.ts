@@ -57,3 +57,13 @@ export class CstLineComment extends CstComment {
     return Tokens.Comments.Line.Kind;
   }
 }
+
+export class CstImplicitList extends CstImplicitNode {
+  declare private $implicitList: void;
+
+  constructor(
+    readonly items: CstReadonlyArray<CstImplicit>,
+  ) {
+    super();
+  }
+}

@@ -171,10 +171,10 @@ export function dumpNodeEntries(node: CstNode): ReadonlyArray<readonly [any, any
       }
 
       if (skipped.size) {
-        errors.push(fmt.entry`skipped ${fmt.toEntry(skipped.values().toArray().join())}`);
+        errors.push(fmt`skipped ${fmt.raw(skipped.values().toArray().join())}`);
       }
       if (discontinuous.length) {
-        errors.push(fmt.entry`spans discontinuous at ${fmt.toEntry(discontinuous.join(", "))}`);
+        errors.push(fmt`spans discontinuous at ${fmt.raw(discontinuous.join(", "))}`);
       }
     }
 
@@ -182,11 +182,11 @@ export function dumpNodeEntries(node: CstNode): ReadonlyArray<readonly [any, any
     if (spans.length && !span.invalid) {
       const start = spans.at(0)![1][GetSpanSymbol].start;
       if (start !== -1 && span.start !== start) {
-        errors.push(fmt.entry`span.start ${span.start} != allSpans[0].span.start ${start}`);
+        errors.push(fmt`span.start ${span.start} != allSpans[0].span.start ${start}`);
       }
       const end = spans.at(-1)![1][GetSpanSymbol].end;
       if (end !== -1 && span.end !== end) {
-        errors.push(fmt.entry`span.end ${span.end} != allSpans[0].span.end ${end}`);
+        errors.push(fmt`span.end ${span.end} != allSpans[0].span.end ${end}`);
       }
     }
 

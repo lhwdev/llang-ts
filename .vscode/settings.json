@@ -13,4 +13,7 @@
   "cSpell.words": [
     "Discardable"
   ],
+  "editor.rulers": [
+    100
+  ]
 }

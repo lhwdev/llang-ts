@@ -139,7 +139,7 @@ function cstExpressionInner() {
         const right = stack.pop();
         const left = stack.pop();
         if (!right || !left) {
-          throw new Error(fmt`null operand for ${operator}: left=${left} right=${right}`);
+          throw new Error(fmt`null operand for ${operator}: left=${left} right=${right}`.s);
         }
         return new CstBinaryOperation(left, operator, right);
       } else if (operator instanceof CstUnaryOperator) {

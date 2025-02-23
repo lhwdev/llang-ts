@@ -57,7 +57,7 @@ export class CstNode implements Spanned {
       const getItem = (key: Spanned): any => {
         const item = allItems.get(key);
         if (!item) {
-          throw new Error(fmt`no item for ${span}; this=${this}, items=${previousItems}`);
+          throw new Error(fmt`no item for ${span}; this=${this}, items=${previousItems}`.s);
         }
         return item;
       };

@@ -26,7 +26,11 @@ export class CstIntermediatePeek extends CstIntermediateNode {
     return super.end(node);
   }
 
-  protected override endSelf(_group: CstGroup): void {
-    // do nothing
+  protected override endSelf(group: CstGroup): void {
+    this.parent.endChildCommon(group, this, false);
+  }
+
+  protected override endSelfWithError(error: unknown | null): void {
+    this.parent.endChildCommon({ error }, this, false);
   }
 }

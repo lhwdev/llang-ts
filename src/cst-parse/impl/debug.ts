@@ -1,6 +1,16 @@
-import { fmt } from "../../utils/format.ts";
+import { fmt, FormatEntries, type FormatEntry } from "../../utils/format.ts";
 import { getContext } from "../CstParseContext.ts";
 
 export function debug(strings: TemplateStringsArray, ...args: any[]) {
-  (getContext() as any).debug.log(fmt.entry(strings, ...args));
+  debug.raw(fmt(strings, ...args));
+}
+
+export namespace debug {
+  export function raw(entry: FormatEntry) {
+    (getContext() as any).debug.log(entry);
+  }
+
+  export function string(str: string) {
+    raw(new FormatEntries.value(str));
+  }
 }
