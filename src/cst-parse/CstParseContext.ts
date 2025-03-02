@@ -5,6 +5,7 @@ import type { CstNodeInfo } from "../cst/CstNodeInfo.ts";
 import type { CstTree } from "../cst/CstTree.ts";
 import type { CstCodeScope, CstCodeScopes } from "./tokenizer/CstCodeScope.ts";
 import type { CstParser } from "./parser.ts";
+import type { CstParseIntrinsics } from "./CstParseIntrinsics.ts";
 
 let baseContext: CstParseContext | null = null;
 
@@ -31,12 +32,13 @@ export interface CstParseContext<out Node extends CstNode = CstNode> {
   code<R extends Token>(fn: (code: CstCodeContext) => R): R;
   code<R>(scope: CstCodeScope, fn: (code: CstCodeContext) => R): R;
 
-  codeScopes: CstCodeScopes;
+  readonly codeScopes: CstCodeScopes;
 
   /// Node management
   beginChild<Child extends CstNode>(info: CstNodeInfo<Child>): CstParseContext<Child>;
   skipping(): Node | null;
 
+  readonly intrinsics: CstParseIntrinsics;
   hintType(type: CstNodeHintType): void;
 
   memoize<T>(calculate: () => T, dependencies?: unknown[]): T;

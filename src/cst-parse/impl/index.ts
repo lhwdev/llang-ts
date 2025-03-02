@@ -9,9 +9,9 @@ import {
 import { isInherited } from "../../utils/extends.ts";
 import { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
 import { CstIntermediateInsertionRoot } from "./CstIntermediateInsertion.ts";
-import { CstIntermediateNode } from "./CstIntermediateNode.ts";
 import { CstIntermediatePeek } from "./CstIntermediatePeek.ts";
 import { CstIntermediateConstraintRoot } from "./CstIntermediateConstraint.ts";
+import { CstIntermediateImplicit } from "./CstIntermediateImplicit.ts";
 
 CstIntermediateGroup.prototype.beginSpecialNode = function (info) {
   if (!isInherited(info, CstSpecialNode)) return null;
@@ -21,7 +21,7 @@ CstIntermediateGroup.prototype.beginSpecialNode = function (info) {
     case CstDetachedNode:
       throw new Error("TODO");
     case CstImplicitNode:
-      return new (this.childInstance(CstIntermediateNode))(this, info);
+      throw new Error("Internal error: use beginImplicitChild to create implicit node.");
 
     default:
       return null;

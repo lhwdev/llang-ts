@@ -10,11 +10,16 @@ import type {
   CstParseContext,
 } from "../CstParseContext.ts";
 import { ContextKeys, getContext, withContext } from "../CstParseContext.ts";
+import type { CstParseIntrinsics } from "../CstParseIntrinsics.ts";
 import type { CstCodeScope, CstCodeScopes } from "../tokenizer/CstCodeScope.ts";
 import type { CstCodeContextImpl } from "./CstCodeContextImpl.ts";
 import { type CstIntermediateGroup, EmptySlot } from "./CstIntermediateGroup.ts";
 
+export const CstContextParentSymbol = Symbol("CstContextParent");
+
 export interface CstContextParent {
+  [CstContextParentSymbol]: true;
+
   c: CstCodeContextImpl;
   debug: unknown;
 }
@@ -25,6 +30,10 @@ export type CstParseContextParent<Node extends CstNode = CstNode> =
 
 export abstract class CstGroupParseContext<Node extends CstNode>
   implements CstParseContext<Node>, CstContextParent {
+  get [CstContextParentSymbol](): true {
+    return true;
+  }
+
   abstract readonly parent: CstContextParent;
   abstract readonly current: CstIntermediateGroup;
 
@@ -76,6 +85,10 @@ export abstract class CstGroupParseContext<Node extends CstNode>
 
   skipping(): Node | null {
     return this.current.skipping();
+  }
+
+  get intrinsics(): CstParseIntrinsics {
+    return this.current;
   }
 
   hintType(type: CstNodeHintType): void {
