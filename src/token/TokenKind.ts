@@ -17,7 +17,7 @@ export abstract class TokenKind {
       .join(gray("."));
   }
 
-  @format.print
+  @format.representation
   format(): string {
     return formatClass(this);
   }

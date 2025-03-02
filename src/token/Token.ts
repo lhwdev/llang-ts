@@ -1,5 +1,5 @@
 import { tokenKindName } from "../utils/debug.ts";
-import { format, valueToColorString } from "../utils/format.ts";
+import { fmt, format } from "../utils/format.ts";
 import type { Span } from "./Span.ts";
 import { GetSpanSymbol, type Spanned } from "./Spanned.ts";
 import { TokenKind } from "./TokenKind.ts";
@@ -24,7 +24,13 @@ export class Token<Kind extends TokenKind = TokenKind> implements Spanned {
   constructor(
     readonly kind: Kind,
     readonly span: Span,
-  ) {}
+  ) {
+    if (this.kind.code.length !== span.length) {
+      throw new Error(
+        fmt`kind.code.length != span.length; ${this.kind.code.length} != ${span.length}`.s,
+      );
+    }
+  }
 
   get code(): string {
     return this.kind.code;
@@ -52,11 +58,10 @@ export class Token<Kind extends TokenKind = TokenKind> implements Spanned {
       ` code='${this.kind.code}')`;
   }
 
-  @format.print
+  @format.representation
   format() {
-    return `${colors.brightBlue(tokenKindName(this.kind))}` +
-      `[${colors.yellow(this.span.start.toString())}, ` +
-      `${colors.yellow((this.span.start + this.kind.code.length).toString())}]` +
-      ` ${valueToColorString(this.kind.code)}`;
+    return fmt`${
+      fmt.brightBlue(tokenKindName(this.kind))
+    } [${this.span.start}, ${this.span.end}] ${this.kind.code}`.s;
   }
 }

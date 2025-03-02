@@ -102,7 +102,7 @@ export class CstNode implements Spanned {
 
   /// Formatting
 
-  @format.print
+  @format.representation
   dump(): string {
     return dumpNode(this);
   }

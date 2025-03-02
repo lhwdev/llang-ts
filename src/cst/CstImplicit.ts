@@ -68,4 +68,9 @@ export class CstImplicitList extends CstImplicit {
   ) {
     super();
   }
+
+  @format.representation
+  override dump() {
+    return fmt`${formatNodeName(this)} ${this.items.map((item) => dumpNodeEntry(item))}`.s;
+  }
 }
