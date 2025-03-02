@@ -1,7 +1,6 @@
-import { dim, rgb8 } from "./ansi.ts";
+import { dim } from "./ansi.ts";
 import { CstNode } from "../cst/CstNode.ts";
-import { Span } from "../token/Span.ts";
-import { GetSpanSymbol, type Spanned } from "../token/Spanned.ts";
+import { GetSpanSymbol, SpanGroupSymbol, type Spanned } from "../token/Spanned.ts";
 import { TokenKind } from "../token/TokenKind.ts";
 import {
   classToStringEntry,
@@ -13,6 +12,7 @@ import {
 } from "./format.ts";
 import { type FormatEntry, formatFn } from "./format.ts";
 import { CstTree } from "../cst/CstTree.ts";
+import { CstImplicitNode } from "../cst-parse/CstSpecialNode.ts";
 
 export function dumpNode(node: CstNode): string {
   return formatFn(null, () => dumpNodeEntry(node));
@@ -37,27 +37,50 @@ export function dumpNodeEntries(node: CstNode): ReadonlyArray<readonly [any, any
       if (key == "tree") continue;
       if (typeof value === "object" && value) {
         if (GetSpanSymbol in value) {
+          if (SpanGroupSymbol in value) {
+            const spans: Spanned[] = value[SpanGroupSymbol];
+
+            // check if span is continuous
+            let continuous = true;
+            if (spans.length > 0) {
+              let offset = spans[0][GetSpanSymbol].end;
+              for (let i = 1; i < spans.length; i++) {
+                const span = spans[i][GetSpanSymbol];
+                if (span.start !== offset) {
+                  continuous = false;
+                  break;
+                }
+                offset = span.end;
+              }
+            }
+            if (!continuous) {
+              spans.forEach((span, index) => spannedMap.set(`${key}[${index}]`, span));
+              continue;
+            }
+          }
           spannedMap.set(key, value as Spanned);
           continue;
         }
 
         if (Array.isArray(value) && value.length) {
-          let offset = -1;
-          for (const item of value) {
-            if (!(GetSpanSymbol in item)) break;
-            const span = item[GetSpanSymbol] as Span;
-            if (offset == -1 || offset == span.start) {
-              offset = span.end;
-            } else {
-              throw new Error(`${value} is misaligned; span is not continuous`);
-            }
-          }
-          if (offset != -1) {
-            const result = [...value] as any;
-            result[GetSpanSymbol] = new Span(value[0][GetSpanSymbol].start, offset);
-            spannedMap.set(key, result as Spanned);
-            continue;
-          }
+          other.set(key, fmt`Use CstArray instead of normal array.`);
+
+          // let offset = -1;
+          // for (const item of value) {
+          //   if (!(GetSpanSymbol in item)) break;
+          //   const span = item[GetSpanSymbol] as Span;
+          //   if (offset == -1 || offset == span.start) {
+          //     offset = span.end;
+          //   } else {
+          //     throw new Error(`${value} is misaligned; span is not continuous`);
+          //   }
+          // }
+          // if (offset != -1) {
+          //   const result = [...value] as any;
+          //   result[GetSpanSymbol] = new Span(value[0][GetSpanSymbol].start, offset);
+          //   spannedMap.set(key, result as Spanned);
+          //   continue;
+          // }
         }
       }
       other.set(key, value);
@@ -77,11 +100,6 @@ export function dumpNodeEntries(node: CstNode): ReadonlyArray<readonly [any, any
     let propertyIndex = 0;
     const spans: (readonly [string, Spanned])[] = [];
     if (treeSpans.length || propertySpans.length) {
-      const mapTree = (
-        spanned: Spanned,
-        index: number,
-      ): readonly [string, Spanned] => [`_tree_${index}`, spanned];
-
       let offset = Math.min(
         treeSpans.at(0)?.[GetSpanSymbol].start ?? Infinity,
         propertySpans.at(0)?.[1][GetSpanSymbol].start ?? Infinity,
@@ -89,13 +107,33 @@ export function dumpNodeEntries(node: CstNode): ReadonlyArray<readonly [any, any
       const discontinuous = [];
       const skipped = new Set<Spanned>();
 
-      const addSpan = (item: readonly [string, Spanned]) => {
+      const addSpan = (item: readonly [string, Spanned], tree: Spanned = item[1]) => {
         const spanned = item[1];
         const span = spanned[GetSpanSymbol];
         if (span.start !== offset) discontinuous.push(offset);
         spans.push(item);
-        skipped.delete(spanned);
+        skipped.delete(tree);
         offset = span.end;
+      };
+
+      const addTree = (
+        spanned: Spanned,
+        index: number,
+      ) => {
+        if (spanned instanceof CstTree) {
+          const node = spanned.node;
+          if (node instanceof CstImplicitNode) {
+            if (node.tree.span.length) {
+              addSpan([`_implicit_${index}`, node.node], spanned);
+            } else {
+              if (node.tree.span.start !== offset) discontinuous.push(offset);
+              skipped.delete(spanned);
+            }
+            return;
+          }
+          return addSpan([`_tree_${index}`, spanned.node], spanned);
+        }
+        return addSpan([`_tree_${index}`, spanned]);
       };
 
       let count = 0;
@@ -111,7 +149,7 @@ export function dumpNodeEntries(node: CstNode): ReadonlyArray<readonly [any, any
           continue;
         }
         if (!property) {
-          addSpan(mapTree(tree!, treeIndex));
+          addTree(tree!, treeIndex);
           treeIndex++;
           continue;
         }
@@ -164,7 +202,7 @@ export function dumpNodeEntries(node: CstNode): ReadonlyArray<readonly [any, any
             propertyIndex++;
           } else {
             if (treeSpan.start !== offset) discontinuous.push(offset);
-            addSpan(mapTree(tree, treeIndex));
+            addTree(tree, treeIndex);
             treeIndex++;
           }
         }
@@ -202,27 +240,23 @@ export function dumpNodeEntry(node: CstNode): FormatEntry {
   return formatRaw({
     oneLine: false,
     important: (value) => value instanceof CstNode,
-    handleObject: (value) => {
-      if (value instanceof CstNode) return dumpNodeEntry(value);
-      if (value instanceof CstTree) return dumpNodeEntry(value.node);
-      return classToStringEntry(value, true);
-    },
+    handleObject: (value) => classToStringEntry(value, true),
   }, () => {
-    let name = node.constructor.name;
-    if (!name) name = Object.getPrototypeOf(node).constructor.name;
-
-    const list = new FormatEntries.list();
-    list.push(new FormatEntries.value(rgb8(name, 19)));
-
     const group = objectLiteralToStringEntry(
       node,
       " = ",
-      (entry) => new FormatEntries.group(["(", false], entry, [")", false]),
+      (entry) => new FormatEntries.group([fmt.gray`(`, false], entry, [fmt.gray`)`, false], true),
       (key, _value, list) => key.startsWith("_") ? new FormatEntries.style(dim, list) : list,
     );
-    list.push(group);
-    return list;
+    return fmt`${formatNodeName(node)}${group}`;
   });
+}
+
+export function formatNodeName(node: CstNode): FormatEntry {
+  let name = node.constructor.name;
+  if (!name) name = Object.getPrototypeOf(node).constructor.name;
+
+  return fmt.rgb8(name, 19);
 }
 
 export function tokenKindNames(kind: TokenKind): string[] {
