@@ -22,6 +22,10 @@ export class CstDetachedNode<Value> extends CstSpecialNode {
 
 export class CstImplicitNode extends CstSpecialNode {
   declare private $special_implicit: void;
+
+  constructor(readonly node: CstNode) {
+    super();
+  }
 }
 
 export class CstInsertedNode<Node extends CstNode> extends CstSpecialNode {

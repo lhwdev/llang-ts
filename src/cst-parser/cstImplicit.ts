@@ -1,6 +1,5 @@
 import { code, codeScopes, useImplicitNode } from "../cst-parse/intrinsics.ts";
 import { nullableParser, parser } from "../cst-parse/parser.ts";
-import { CstList } from "../cst/common/CstList.ts";
 import {
   CstBlockComment,
   CstImplicit,

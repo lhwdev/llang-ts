@@ -1,9 +1,11 @@
 import type { Token } from "../token/Token.ts";
 import { Tokens } from "../token/Tokens.ts";
+import { dumpNodeEntry, formatNodeName } from "../utils/debug.ts";
+import { fmt, format } from "../utils/format.ts";
 import type { CstReadonlyArray } from "./CstArray.ts";
-import { CstImplicitNode } from "../cst-parse/CstSpecialNode.ts";
+import { CstNode } from "./CstNode.ts";
 
-export class CstImplicit extends CstImplicitNode {
+export class CstImplicit extends CstNode {
   declare private $implicit: void;
 }
 
@@ -58,7 +60,7 @@ export class CstLineComment extends CstComment {
   }
 }
 
-export class CstImplicitList extends CstImplicitNode {
+export class CstImplicitList extends CstImplicit {
   declare private $implicitList: void;
 
   constructor(

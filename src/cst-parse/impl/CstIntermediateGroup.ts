@@ -331,6 +331,14 @@ export abstract class CstIntermediateGroup {
     return child;
   }
 
+  beginImplicitChild(info: CstNodeInfo<any>): CstIntermediateGroup {
+    this.ensureInitialized();
+
+    const child = this.createImplicitChild(info);
+    debug.raw(this.debugNodeDebugLine(info, () => child));
+    return child;
+  }
+
   beginSpecialNode(info: CstNodeInfo<any>): CstIntermediateGroup | null {
     throw new Error(
       `implemented by index.ts to avoid circular imports, args=${info}`,
@@ -343,6 +351,12 @@ export abstract class CstIntermediateGroup {
     );
   }
 
+  createImplicitChild(info: CstNodeInfo<any>): CstIntermediateGroup {
+    throw new Error(
+      `implemented by index.ts to avoid circular imports, args=${info}`,
+    );
+  }
+
   protected handleImplicit(): void {
     if (this.isImplicit) return;
     if (this.allowImplicit) {
@@ -350,14 +364,20 @@ export abstract class CstIntermediateGroup {
 
       const cstImplicit = this.resolveContextOrNull(ContextKeys.ImplicitNode)?.value;
       if (!cstImplicit) return;
-      if (!isInherited(cstImplicit.info, CstImplicitNode)) {
-        throw new Error(
-          "All nodes registered as ContextKeys.ImplicitNode should extend CstImplicitNode; " +
-            `${cstImplicit.info.name} does not.`,
-        );
-      }
 
-      nullableNode(CstImplicitNode, () => cstImplicit());
+      const implicit = this.beginImplicitChild(CstImplicitNode);
+      try {
+        implicit.withSelf(() => {
+          const node = cstImplicit();
+          if (node) {
+            implicit.end(new CstImplicitNode(node));
+          } else {
+            implicit.endWithError(null);
+          }
+        });
+      } catch (e) {
+        implicit.endWithError(e);
+      }
     }
   }
 
