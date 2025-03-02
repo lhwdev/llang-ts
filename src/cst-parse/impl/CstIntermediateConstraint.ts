@@ -18,14 +18,15 @@ import {
 } from "../CstConstraintNode.ts";
 import type { CstCodeScope } from "../tokenizer/CstCodeScope.ts";
 import type { CstGroup } from "./CstGroup.ts";
-import { type CstIntermediateGroup, DebugName } from "./CstIntermediateGroup.ts";
+import type { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
 import { CstIntermediateNode } from "./CstIntermediateNode.ts";
 import { CstArray } from "../../cst/CstArray.ts";
 import { nullableNode, peek } from "../inlineNode.ts";
 import { detailedParseError } from "./errors.ts";
 import { fmt } from "../../utils/format.ts";
-import { type CstNodeHintType, getContext } from "../CstParseContext.ts";
+import { type CstNodeHintType, NodeHint } from "../CstParseContext.ts";
 import { CstConstraintNodeRoot } from "../CstSpecialNode.ts";
+import { intrinsics } from "../intrinsics.ts";
 
 export class CstIntermediateConstraintRoot extends CstIntermediateNode {
   protected override createChild(info: CstNodeInfo<any>): CstIntermediateGroup {
@@ -267,7 +268,7 @@ export class RepeatConstraint extends Constraint<CstRepeatNodeInfo<CstNode>> {
 
     const consume = () =>
       nullableNode(CstNode, () => {
-        getContext().hintType({ [DebugName]: "CstConsume" });
+        intrinsics.debugName("consume");
         if (result.length && separator) {
           const sep = separator.fn();
           if (!sep) return null;
@@ -393,7 +394,9 @@ export class RepeatConstraint extends Constraint<CstRepeatNodeInfo<CstNode>> {
   }
 }
 
-const ConstraintChainMarker = Symbol("ConstraintChainMarker");
+class ConstraintChainMarker extends NodeHint<ConstraintChain> {
+  declare private constraintChainMarker: void;
+}
 
 abstract class ConstraintChainNext {
   abstract readonly name: string;
@@ -447,8 +450,8 @@ class ConstraintChain extends ConstraintChainNext {
     if (this.value) throw new Error("already resolved");
     return nullableNode(this.c.info, () => {
       try {
-        getContext().hintType({ [DebugName]: this.name });
-        getContext().hintType({ [ConstraintChainMarker]: this });
+        intrinsics.debugNodeName(this.name);
+        intrinsics.hintSelf(new ConstraintChainMarker(this));
         return this.c.resolve(this.next.asNext);
       } catch (e) {
         const chains = this.debugWholeChain ?? this.chains;
@@ -473,8 +476,8 @@ class ConstraintChain extends ConstraintChainNext {
   }
 
   override asNext: ConstraintNext = Object.assign(() =>
-    peek(() => {
-      getContext().hintType({ [DebugName]: `${this.c.info.name}.asNext` });
+    intrinsics.testNode(() => {
+      intrinsics.debugName(`${this.c.info.name}.asNext`);
       return this.c.test(this.next.asNext);
     }), {
     expectError: () => {
@@ -497,13 +500,9 @@ class CstIntermediateConstraint extends CstIntermediateNode {
   constraintChain?: ConstraintChain;
 
   override hintType(hint: CstNodeHintType) {
-    if (typeof hint === "object" && ConstraintChainMarker in hint) {
-      const value = hint[ConstraintChainMarker];
-      if (value instanceof ConstraintChain) {
-        this.constraintChain = value;
-      } else {
-        throw new Error("illegal hint");
-      }
+    if (hint instanceof ConstraintChainMarker) {
+      const value = hint.value;
+      this.constraintChain = value;
       return;
     }
     super.hintType(hint);

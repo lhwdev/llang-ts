@@ -17,7 +17,7 @@ import { type CstCodeContextImpl, subscribeToken } from "./CstCodeContextImpl.ts
 import { CstGroup, type CstGroupItem } from "./CstGroup.ts";
 import type { CstParseContextImpl } from "./CstParseContextImpl.ts";
 import { detailedParseError } from "./errors.ts";
-import type { CstParseContextParent } from "./CstGroupParseContext.ts";
+import type { CstParseIntrinsics } from "../CstParseIntrinsics.ts";
 
 export const EmptySlot = Symbol("EmptySlot");
 export const DebugName = Symbol("DebugName");
@@ -195,12 +195,41 @@ export abstract class CstIntermediateGroup {
     this.ensureSnapshotExists();
   }
 
+  markVital(reason?: Spanned) {
+    if (this.resolveContextOrNull(InternalContextKeys.InsideTest)?.value) {
+      throw new InsideTestError(reason);
+    }
+  }
+
   getSlot(): unknown {
     return EmptySlot;
   }
 
   updateSlot<T>(value: T): T {
     return value;
+  }
+
+  /// Intrinsics
+
+  intrinsicTestNode(node: () => CstNode | boolean | null): boolean {
+    return !!this.beginChild(CstPeekNode).withSelf((child) => {
+      child.debugParserLocation = StackFrame.from({ functionName: "intrinsics.testNode" });
+      child.provideContext(InternalContextKeys.InsideTest.provides(true));
+      let result;
+      try {
+        result = node();
+      } catch (e) {
+        if (e instanceof InsideTestError) {
+          return child.end(new CstPeekNode(true));
+        } else {
+          if (result = child.endWithError(e)) {
+            return result as CstPeekNode<ReturnType<typeof node>>;
+          }
+          throw e;
+        }
+      }
+      return child.end(new CstPeekNode(node()));
+    }).value;
   }
 
   /// Code parsing
@@ -385,7 +414,7 @@ export abstract class CstIntermediateGroup {
   protected childInstance<Ctor extends new (...args: any) => CstIntermediateGroup>(
     type: Ctor,
   ): Ctor {
-    return this.contextualNode.childInstance(type);
+    return this.contextualParent.childInstance(type);
   }
 
   beforeEnd<Node extends CstNode>(node: Node): CstGroup<Node> {

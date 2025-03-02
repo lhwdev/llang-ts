@@ -1,5 +1,5 @@
 import { node } from "../../cst-parse/inlineNode.ts";
-import { code, codeScopes } from "../../cst-parse/intrinsics.ts";
+import { code, codeScopes, intrinsics } from "../../cst-parse/intrinsics.ts";
 import { nullableParser, parser } from "../../cst-parse/parser.ts";
 import { CstArray } from "../../cst/CstArray.ts";
 import {
@@ -42,6 +42,8 @@ export const cstBooleanLiteralOrNull = nullableParser(CstBooleanLiteral, () => {
 export const cstStringTemplateOrNull = nullableParser(CstStringTemplate, () => {
   const left = code((c) => c.next(Tokens.Literal.String.Left));
   if (!left) return null;
+
+  intrinsics.vital(left);
 
   const kind = left.kind.kind;
   const scope = codeScopes.stringLiteral(kind);

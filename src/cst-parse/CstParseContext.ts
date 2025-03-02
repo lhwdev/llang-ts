@@ -25,7 +25,7 @@ export function withContext<R>(context: CstParseContext<any>, fn: () => R): R {
   }
 }
 
-export type CstNodeHintType = "discardable" | "nullable" | object;
+export type CstNodeHintType = "discardable" | "nullable" | NodeHint<any>;
 
 export interface CstParseContext<out Node extends CstNode = CstNode> {
   /// Code parsing
@@ -53,6 +53,22 @@ export interface CstParseContext<out Node extends CstNode = CstNode> {
   endWithError(error: unknown | null): Node | null;
 
   insertChild<Child extends CstNode>(node: Child): Child;
+}
+
+export abstract class NodeHint<Value> {
+  declare private $: void;
+
+  constructor(readonly value: Value) {}
+}
+
+export namespace NodeHints {
+  export class DebugName extends NodeHint<string> {
+    declare private debugName: void;
+  }
+
+  export class DebugNodeName extends NodeHint<string> {
+    declare private debugNodeName: void;
+  }
 }
 
 export class ContextKey<T> {

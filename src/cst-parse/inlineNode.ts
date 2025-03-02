@@ -2,6 +2,9 @@ import type { CstNode } from "../cst/CstNode.ts";
 import { CstDetachedNode, CstPeekNode } from "./CstSpecialNode.ts";
 import type { CstNodeConstructor, CstNodeInfo } from "../cst/CstNodeInfo.ts";
 import { getContext, withContext } from "./CstParseContext.ts";
+import { CstParserSymbol } from "./parser.ts";
+
+/// NOTE: if you update code of node() or nullableNode(), you should also modify parser.ts.
 
 export function node<Node extends CstNode>(
   info: CstNodeInfo<Node>,
@@ -20,6 +23,7 @@ export function node<Node extends CstNode>(
     return result;
   }
 }
+node[CstParserSymbol] = true;
 
 export function nullableNode<Node extends CstNode>(
   info: CstNodeInfo<Node>,
@@ -43,6 +47,7 @@ export function nullableNode<Node extends CstNode>(
     return result;
   }
 }
+nullableNode[CstParserSymbol] = true;
 
 export function discardableNode<Node extends CstNode>(
   info: CstNodeInfo<Node>,
@@ -61,6 +66,7 @@ export function discardableNode<Node extends CstNode>(
     return child.endWithError(e);
   }
 }
+discardableNode[CstParserSymbol] = true;
 
 export function detachMap<Node extends CstNode, I, R>(
   n: CstNodeConstructor<{ value: R } & CstNode, [R]>,
