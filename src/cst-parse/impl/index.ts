@@ -41,6 +41,14 @@ CstIntermediateGroup.prototype.createSpecialChild = function (info) {
   }
 };
 
+CstIntermediateGroup.prototype.createImplicitChild = function (info) {
+  if (info !== CstImplicitNode) {
+    throw new Error(`info != CstImplicitNode, info=${info.name}`);
+  }
+
+  return new (this.childInstance(CstIntermediateImplicit))(this, info);
+};
+
 CstIntermediateGroup.prototype.insertChild = function (node) {
   const child = this.beginChild(CstInsertedNode);
   if (!(child instanceof CstIntermediateInsertionRoot)) throw new Error("insertion not supported");
