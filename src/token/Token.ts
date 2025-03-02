@@ -3,7 +3,6 @@ import { format, valueToColorString } from "../utils/format.ts";
 import type { Span } from "./Span.ts";
 import { GetSpanSymbol, type Spanned } from "./Spanned.ts";
 import { TokenKind } from "./TokenKind.ts";
-import * as colors from "../utils/colors.ts";
 import type { TokenKinds } from "./TokenKinds.ts";
 
 /**

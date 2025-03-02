@@ -15,7 +15,7 @@ import type { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
 import type { CstTree } from "../../cst/CstTree.ts";
 import { debug } from "../impl/debug.ts";
-import { dim, strikethrough } from "../../utils/colors.ts";
+import { dim, strikethrough } from "../../utils/ansi.ts";
 import type { CstGroup } from "./CstGroup.ts";
 import { isInherited } from "../../utils/extends.ts";
 import { CstDetachedNode, CstSpecialNode } from "../CstSpecialNode.ts";

@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-control-regex
 // Copy-pasted from jsr:@std/fmt/colors.ts
 
 // Copyright 2018-2024 the Deno authors. All rights reserved. MIT license.
@@ -162,6 +163,7 @@ const Bold = code([1], 22);
 const Dim = code([2], 22);
 
 function intensity(str: string, code: Code): string {
+  if (!enabled) return str;
   // if (!str.includes(code.close)) return run(str, code);
 
   let result = code.open;
@@ -999,6 +1001,22 @@ export function bgRgb24(str: string, color: number | Rgb): string {
   );
 }
 
+/// Other formats: newly added
+
+interface LinkParams {
+  id?: string;
+  [key: string]: string | undefined;
+}
+
+export function link(str: string, href: string, params?: LinkParams): string {
+  const paramsStr = params && Object.entries(params).map(([k, v]) => `${k}=${v}`).join(":");
+  return run(str, {
+    open: `\x1b]8;${paramsStr};${href}\x07`,
+    close: "\x1b]8;;\x07",
+    regexp: /\x1b]8;;\x07/g,
+  });
+}
+
 export const AllFormats = {
   reset,
   bold,
@@ -1045,6 +1063,7 @@ export const AllFormats = {
   bgRgb8,
   rgb24,
   bgRgb24,
+  link,
 };
 
 export type AllFormats = typeof AllFormats;

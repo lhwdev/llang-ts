@@ -1,4 +1,4 @@
-import { yellow } from "../utils/colors.ts";
+import { yellow } from "../utils/ansi.ts";
 import type { CstNode } from "../cst/CstNode.ts";
 import type { CstNodeInfo } from "../cst/CstNodeInfo.ts";
 import { node, nullableNode } from "./inlineNode.ts";

@@ -1,4 +1,4 @@
-import { bgRgb24, bgRgb8, bold, rgb24, rgb8 } from "../utils/colors.ts";
+import { bgRgb24, bgRgb8, bold, rgb24, rgb8 } from "../utils/ansi.ts";
 
 paletteRgb8();
 

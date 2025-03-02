@@ -11,136 +11,11 @@ import {
   rgb8,
   stripAnsiCode,
   yellow,
-} from "./colors.ts";
+} from "./ansi.ts";
 
 type ParametersExcept0<F extends (...args: any) => any> = F extends
   (arg0: any, ...args: infer T) => any ? T
   : never;
-
-interface FormatFn<F extends (value: string, ...args: any) => string> {
-  (
-    value: Entry | (() => Entry | string) | string,
-    ...args: ParametersExcept0<F>
-  ): Entry;
-  (
-    ...args: ParametersExcept0<F>
-  ): (strings: TemplateStringsArray, ...args: any) => Entry;
-  (
-    ...args: ParametersExcept0<F>["length"] extends 0
-      ? [strings: TemplateStringsArray, ...args: any]
-      : never
-  ): Entry;
-}
-type Formats = {
-  [Key in keyof AllFormats]: FormatFn<AllFormats[Key]>;
-};
-interface Fmt extends Formats {
-  (strings: TemplateStringsArray, ...args: any[]): Entry;
-  (options?: Options): (strings: TemplateStringsArray, ...args: any[]) => Entry;
-
-  raw(input: Entry | unknown): Entry;
-
-  symbol(name: unknown): Entry;
-  parameter(name: unknown): Entry;
-  code(content: unknown): Entry;
-  lazy(fn: (context: FormatContext) => Entry | string): Entry;
-
-  join(entries: Entry[], separator?: Entry): Entry;
-
-  classLike(name: string, content: Entry | string): Entry;
-}
-
-function mapInput(input: Entry | unknown): Entry {
-  if (input instanceof Entry) return input;
-  if (typeof input === "symbol") return new ValueEntry(input.toString());
-  return new ValueEntry(`${input}`);
-}
-
-export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
-  if (Array.isArray(a)) {
-    return fmtTemplate(a as any, ...args);
-  } else {
-    return (strings: TemplateStringsArray, ...args: any[]) =>
-      formatRaw(a, () => fmtTemplate(strings, ...args));
-  }
-}, {
-  raw: mapInput,
-
-  symbol(name: unknown) {
-    return this.yellow(`${name}`);
-  },
-
-  parameter(name: unknown) {
-    return new ValueEntry(red(`${name}`));
-  },
-
-  code(content: unknown) {
-    return new ValueEntry(rgb8(`${content}`, 110));
-  },
-
-  lazy(fn: (context: FormatContext) => Entry | string) {
-    return new LazyEntry((context) => mapInput(fn(context)));
-  },
-
-  join(entries: Entry[], separator: Entry = new ValueEntry(", ")): Entry {
-    return FormatEntries.join(entries, separator);
-  },
-
-  classLike(name: string, content: Entry | string) {
-    const list = new ListEntry();
-    list.push(
-      new ValueEntry(
-        name.includes("\x1b")
-          ? name
-          : content instanceof ObjectEntry && Options.important(content.value)
-          ? bold(name)
-          : name,
-      ),
-    );
-    list.push(new GroupEntry(["(", false], mapInput(content), [")", false]));
-    return list;
-  },
-
-  ...Object.fromEntries(
-    Object.entries(AllFormats as Record<string, (value: string, ...args: any) => string>)
-      .map(([key, fn]) => [key, (...args: any[]) => {
-        if (fn.length === 1) {
-          const strings = args[0];
-          if (Array.isArray(strings) && typeof strings.at(0) === "string" && "raw" in strings) {
-            return new StyleEntry(fn, fmt(strings as TemplateStringsArray, ...args.slice(1)));
-          }
-        }
-        if (args.length === fn.length) {
-          const [value, ...other] = args;
-          if (value instanceof Entry) {
-            return new StyleEntry((str) => fn(str, ...other), value);
-          } else if (typeof value === "function") {
-            return new StyleEntry(
-              (str) => fn(str, ...other),
-              new LazyEntry(() => {
-                const v = value();
-                return v instanceof Entry ? v : new ValueEntry(`${v}`);
-              }),
-            );
-          } else {
-            return new ValueEntry(fn(`${value}`, ...other));
-          }
-        } else {
-          return (str: TemplateStringsArray, ...innerArgs: any) =>
-            new StyleEntry((str) => fn(str, ...args), fmt(str, ...innerArgs));
-        }
-      }]),
-  ) as any as Formats,
-});
-
-function fmtTemplate(strings: TemplateStringsArray, ...args: any[]): Entry {
-  const list = new ListEntry();
-  for (let i = 0; i < strings.length; i++) {
-    if (i !== 0) list.push(valueToColorStringEntry(args[i - 1]));
-    list.push(new ValueEntry(strings[i]));
-  }
-  return list;
-}
 
 export function format(value: any, options?: Options): string {
   return valueToColorString(value, options);
@@ -151,10 +26,9 @@ export function formatClass(value: any, options?: Options): string {
 }
 
 /// Format Symbols & Constants
-export const ToFormatString = Symbol("ToFormatString"); // function: () => string
+export const ToFormatString = Symbol("ToFormatString"); // function: () => string | Entry
 export const FormatObjectEntries = Symbol("FormatObjectEntries"); // value: get () => string
 export const FormatClassName = Symbol("FormatClassName"); // value: get () => string
-export const MaxWidth = 100;
 export const Indent = "  ";
 
 /// Format decorators
@@ -170,10 +44,9 @@ function formatSymbolDecorator(
     if (isValue && context.kind === "method") {
       return context.addInitializer(function () {
         Object.defineProperty(this, symbol, {
-          get() {
-            return map(context.access.get(this).call(this));
-          },
+          get: () => map(context.access.get(this).call(this)),
           enumerable: false,
+          configurable: true,
         });
       });
     }
@@ -181,6 +54,7 @@ function formatSymbolDecorator(
       Object.defineProperty(this, symbol, {
         get: () => map(context.access.get(this)),
         enumerable: false,
+        configurable: true,
       });
     });
   };
@@ -190,7 +64,40 @@ export namespace format {
   export const className = formatSymbolDecorator(FormatClassName, true);
   export const objectEntries = formatSymbolDecorator(FormatObjectEntries, true);
 
-  export const print = formatSymbolDecorator(ToFormatString, false);
+  export function print(_value: () => string | Entry, context: ClassMethodDecoratorContext): void {
+    context.addInitializer(function () {
+      Object.defineProperty(this, ToFormatString, {
+        get: () => context.access.get(this),
+        enumerable: false,
+        configurable: true,
+      });
+    });
+  }
+
+  export function representation(
+    _value: () => string | Entry,
+    context: ClassMethodDecoratorContext,
+  ): void {
+    context.addInitializer(function () {
+      Object.defineProperty(this, ToFormatString, {
+        get: () => context.access.get(this),
+        enumerable: false,
+        configurable: true,
+      });
+      if ("Deno" in globalThis) {
+        Object.defineProperty(this, Symbol.for("Deno.customInspect"), {
+          get: () => (_inspect: typeof Deno.inspect, inspectOptions: Deno.InspectOptions) => {
+            return formatRaw(
+              { oneLine: inspectOptions.compact ?? true, style: inspectOptions.colors ?? true },
+              () => mapInput(context.access.get(this)),
+            );
+          },
+          enumerable: false,
+          configurable: true,
+        });
+      }
+    });
+  }
 }
 
 export const ObjectStack: object[] = [];
@@ -199,6 +106,8 @@ let SkipTrailing = false;
 
 let Options = {
   oneLine: false,
+  style: true,
+  maxWidth: 100,
   handleObject: (value: object): Entry => objectToStringEntry(value),
   important: (_value: object): boolean => true,
 };
@@ -222,7 +131,7 @@ class OneLineOutput {
 
     const length = this.length + stripAnsiCode(str).length;
     this.length = length;
-    if (!Options.oneLine && length > MaxWidth) throw TooLongError;
+    if (!Options.oneLine && length > Options.maxWidth) throw TooLongError;
   }
 
   forkChild() {
@@ -237,6 +146,7 @@ class OneLineOutput {
 class MultiLineOutput {
   constructor(
     public result: string = "",
+    public length: number = 0,
     public last: boolean | null = false,
   ) {}
 
@@ -247,20 +157,27 @@ class MultiLineOutput {
 
     if (newLine) {
       const depth = ObjectStack.length;
-      this.result += "\n" + "  ".repeat(depth);
+      this.result += "\n" + Indent.repeat(depth);
+      this.length = Indent.length * depth;
     }
 
     this.result += line;
+    this.length += stripAnsiCode(line).length;
 
     this.last = right;
   }
 
   forkChild() {
-    return new MultiLineOutput("", this.last);
+    return new MultiLineOutput("", 0, this.last);
   }
 
   pushFork(from: MultiLineOutput) {
     this.result += from.result;
+    if (from.result.includes("\n")) {
+      this.length = from.length;
+    } else {
+      this.length += from.length;
+    }
     this.last = from.last;
   }
 
@@ -270,6 +187,8 @@ class MultiLineOutput {
 }
 
 abstract class Entry {
+  declare private $entry: void;
+
   abstract oneLine(output: OneLineOutput): void;
   abstract multiLine(output: MultiLineOutput): void;
 
@@ -284,9 +203,10 @@ abstract class Entry {
 
 class GroupEntry extends Entry {
   constructor(
-    readonly left: [string, spacing: boolean],
+    readonly left: [Entry, spacing: boolean],
     readonly item: Entry,
-    readonly right: [string, spacing: boolean],
+    readonly right: [Entry, spacing: boolean],
+    readonly wrap: boolean,
   ) {
     super();
   }
@@ -294,25 +214,27 @@ class GroupEntry extends Entry {
   override oneLine(output: OneLineOutput) {
     const [left, leftSpacing] = this.left;
     const [right, rightSpacing] = this.right;
-    output.print(gray(left));
+    left.oneLine(output);
     if (leftSpacing) output.print(" ");
     this.item.oneLine(output);
     if (rightSpacing) output.print(" ");
-    output.print(gray(right));
+    right.oneLine(output);
   }
 
   override multiLine(output: MultiLineOutput): void {
     const oneLine = new OneLineOutput();
-    oneLine.length += output.result.length - output.result.lastIndexOf("\n");
+    oneLine.length += output.length - output.result.lastIndexOf("\n");
     try {
       this.oneLine(oneLine);
       output.print(oneLine.result);
     } catch (e) {
       if (e !== TooLongError) throw e;
 
-      output.print(gray(this.left[0]), [false, true]);
+      this.left[0].multiLine(output);
+      if (this.wrap) output.last = true;
       this.item.multiLine(output);
-      output.print(gray(this.right[0]), [true, false]);
+      if (this.wrap) output.last = true;
+      this.right[0].multiLine(output);
     }
   }
 }
@@ -350,6 +272,7 @@ class ContextEntry<Key extends keyof FormatContext = keyof FormatContext> extend
 class ValueEntry extends Entry {
   constructor(readonly text: string) {
     super();
+    // if (text.includes("\x1b")) throw new Error("do not insert style directly into ValueEntry");
   }
 
   override oneLine(output: OneLineOutput): void {
@@ -462,13 +385,21 @@ class ObjectEntry extends Entry {
   }
 }
 
-class TrailingEntry extends ValueEntry {
+class TrailingEntry extends Entry {
+  constructor(readonly entry: Entry) {
+    super();
+  }
+
   override oneLine(output: OneLineOutput): void {
     if (SkipTrailing) {
       SkipTrailing = false;
       return;
     }
-    super.oneLine(output);
+    this.entry.oneLine(output);
+  }
+
+  override multiLine(output: MultiLineOutput): void {
+    this.entry.multiLine(output);
   }
 }
 
@@ -480,14 +411,14 @@ class StyleEntry extends Entry {
   override oneLine(output: OneLineOutput) {
     const child = output.forkChild();
     this.entry.oneLine(child);
-    child.result = this.style(child.result);
+    child.result = Options.style ? this.style(child.result) : child.result;
     output.pushFork(child);
   }
 
   override multiLine(output: MultiLineOutput) {
     const child = output.forkChild();
     this.entry.multiLine(child);
-    child.result = this.style(child.result);
+    child.result = Options.style ? this.style(child.result) : child.result;
     output.pushFork(child);
   }
 }
@@ -515,6 +446,156 @@ export const FormatEntries = {
 
 export type FormatEntry = Entry;
 
+interface FormatFn<F extends (value: string, ...args: any) => string> {
+  (
+    value: Entry | (() => Entry | string) | string,
+    ...args: ParametersExcept0<F>
+  ): Entry;
+  (
+    ...args: ParametersExcept0<F>
+  ): (strings: TemplateStringsArray, ...args: any) => Entry;
+  (
+    ...args: ParametersExcept0<F>["length"] extends 0
+      ? [strings: TemplateStringsArray, ...args: any]
+      : never
+  ): Entry;
+}
+type Formats = {
+  [Key in keyof AllFormats]: FormatFn<AllFormats[Key]>;
+};
+interface Fmt extends Formats {
+  (strings: TemplateStringsArray, ...args: any[]): Entry;
+  (options?: Options): (strings: TemplateStringsArray, ...args: any[]) => Entry;
+
+  raw(input: Entry | unknown): Entry;
+
+  symbol(name: unknown): Entry;
+  parameter(name: unknown): Entry;
+  code(content: unknown): Entry;
+  lazy(fn: (context: FormatContext) => Entry | string): Entry;
+
+  join(entries: Entry[], separator?: Entry): Entry;
+
+  classLike(name: string, content: Entry | string): Entry;
+}
+
+function mapInput(input: Entry | unknown): Entry {
+  if (input instanceof Entry) return input;
+  if (typeof input === "symbol") return new ValueEntry(input.toString());
+  return new ValueEntry(`${input}`);
+}
+
+const CommonStyled = {
+  ",": rawStyle(dim, ","),
+  "(": rawStyle(gray, "("),
+  ")": rawStyle(gray, ")"),
+  "{": rawStyle(gray, "{"),
+  "}": rawStyle(gray, "}"),
+  // "[": rawStyle(gray, "["),
+  // "]": rawStyle(gray, "]"),
+  "[": new ValueEntry("["),
+  "]": new ValueEntry("]"),
+  '"': new ValueEntry('"'),
+};
+
+export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
+  if (Array.isArray(a)) {
+    return fmtTemplate(a as any, ...args);
+  } else {
+    return (strings: TemplateStringsArray, ...args: any[]) =>
+      formatRaw(a, () => fmtTemplate(strings, ...args));
+  }
+}, {
+  raw: mapInput,
+
+  symbol(name: unknown) {
+    return this.yellow(`${name}`);
+  },
+
+  parameter(name: unknown) {
+    return new ValueEntry(red(`${name}`));
+  },
+
+  code(content: unknown) {
+    return new ValueEntry(rgb8(`${content}`, 110));
+  },
+
+  lazy(fn: (context: FormatContext) => Entry | string) {
+    return new LazyEntry((context) => mapInput(fn(context)));
+  },
+
+  join(entries: Entry[], separator: Entry = new ValueEntry(", ")): Entry {
+    return FormatEntries.join(entries, separator);
+  },
+
+  classLike(name: string, content: Entry | string) {
+    const list = new ListEntry();
+    list.push(
+      new ValueEntry(
+        name.includes("\x1b")
+          ? name
+          : content instanceof ObjectEntry && Options.important(content.value)
+          ? bold(name)
+          : name,
+      ),
+    );
+    list.push(
+      new GroupEntry(
+        [CommonStyled["("], false],
+        mapInput(content),
+        [CommonStyled[")"], false],
+        true,
+      ),
+    );
+    return list;
+  },
+
+  ...Object.fromEntries(
+    Object.entries(AllFormats as Record<string, (value: string, ...args: any) => string>)
+      .map(([key, fn]) => [key, (...args: any[]) => {
+        if (fn.length === 1) {
+          const strings = args[0];
+          if (Array.isArray(strings) && typeof strings.at(0) === "string" && "raw" in strings) {
+            return new StyleEntry(fn, fmt(strings as TemplateStringsArray, ...args.slice(1)));
+          }
+        }
+        if (args.length === fn.length) {
+          const [value, ...other] = args;
+          if (value instanceof Entry) {
+            return new StyleEntry((str) => fn(str, ...other), value);
+          } else if (typeof value === "function") {
+            return new StyleEntry(
+              (str) => fn(str, ...other),
+              new LazyEntry(() => {
+                const v = value();
+                return v instanceof Entry ? v : new ValueEntry(`${v}`);
+              }),
+            );
+          } else {
+            return new ValueEntry(fn(`${value}`, ...other));
+          }
+        } else {
+          return (str: TemplateStringsArray, ...innerArgs: any) =>
+            new StyleEntry((str) => fn(str, ...args), fmt(str, ...innerArgs));
+        }
+      }]),
+  ) as any as Formats,
+});
+
+function fmtTemplate(strings: TemplateStringsArray, ...args: any[]): Entry {
+  const list = new ListEntry();
+  for (let i = 0; i < strings.length; i++) {
+    if (i !== 0) list.push(valueToColorStringEntry(args[i - 1]));
+    list.push(new ValueEntry(strings[i]));
+  }
+  return list;
+}
+
+// It is good practice to not use fmt; it may cause infinite recursions.
+function rawStyle(style: (str: string) => string, value: string | Entry) {
+  return new StyleEntry(style, mapInput(value));
+}
+
 export function valueToColorString(
   value: any,
   options?: Options,
@@ -530,20 +611,28 @@ export function valueToColorStringEntry(
     case "number":
     case "boolean":
     case "bigint":
-      v = yellow(value.toString());
+      v = rawStyle(yellow, value.toString());
       break;
     case "string":
-      v = green(`${dim("'")}${JSON.stringify(value).slice(1, -1)}${dim("'")}`);
+      v = rawStyle(
+        green,
+        new GroupEntry(
+          [CommonStyled['"'], false],
+          new ValueEntry(JSON.stringify(value).slice(1, -1)),
+          [CommonStyled['"'], false],
+          false,
+        ),
+      );
       break;
     case "symbol":
-      v = magenta(value.toString());
+      v = rawStyle(magenta, value.toString());
       break;
     case "undefined":
     case "object":
       if (!value) {
-        v = gray(value === null ? "null" : "undefined");
+        v = rawStyle(gray, value === null ? "null" : "undefined");
       } else if (ObjectStack.includes(value)) {
-        v = italic("[recurse]");
+        v = rawStyle(italic, "[recurse]");
       } else {
         if (value instanceof Entry) return value;
 
@@ -573,11 +662,11 @@ export function valueToColorStringEntry(
       } else {
         text = `function ${value.name}`;
       }
-      v = magenta(`${text}`);
+      v = rawStyle(magenta, `${text}`);
       break;
     }
   }
-  return new ValueEntry(v);
+  return v;
 }
 
 export function classPropertiesToString(
@@ -591,7 +680,7 @@ export function classPropertiesToStringEntry(data: object): Entry {
   return objectLiteralToStringEntry(
     data,
     " = ",
-    (entry) => new GroupEntry(["(", false], entry, [")", false]),
+    (entry) => new GroupEntry([CommonStyled["("], false], entry, [CommonStyled[")"], false], true),
   );
 }
 
@@ -606,6 +695,11 @@ export function classToStringEntry(
   data: object,
   fallback: boolean = false,
 ): Entry {
+  if (fallback) {
+    if (ToFormatString in data) return mapInput((data[ToFormatString] as any)());
+    if (Array.isArray(data)) return arrayToStringEntry(data);
+  }
+
   const name = FormatClassName in data
     ? `${data[FormatClassName]}`
     : data.constructor?.name ?? "Object";
@@ -614,18 +708,17 @@ export function classToStringEntry(
   }
 
   if (fallback) {
-    if (Array.isArray(data)) return arrayToStringEntry(data);
     if (name === "Object") return objectLiteralToStringEntry(data);
   }
 
   const list = new ListEntry();
   list.push(
-    new ValueEntry(name.includes("\x1b") ? name : Options.important(data) ? bold(name) : name),
+    mapInput(name.includes("\x1b") ? name : Options.important(data) ? rawStyle(bold, name) : name),
   );
   const obj = objectLiteralToStringEntry(
     data,
     " = ",
-    (entry) => new GroupEntry(["(", false], entry, [")", false]),
+    (entry) => new GroupEntry([CommonStyled["("], false], entry, [CommonStyled[")"], false], true),
   );
   list.push(obj);
   return list;
@@ -638,8 +731,10 @@ export function objectToString(
   return formatFn(options, () => objectToStringEntry(data));
 }
 
-export function objectToStringEntry(data: object) {
+export function objectToStringEntry(data: object, maybeClass: boolean = true) {
+  if (ToFormatString in data) return mapInput((data[ToFormatString] as any)());
   if (Array.isArray(data)) return arrayToStringEntry(data);
+  if (!maybeClass) return objectLiteralToStringEntry(data);
   const name = data.constructor?.name;
   if (!name || name === "Object") return objectLiteralToStringEntry(data);
   return classToStringEntry(data);
@@ -656,7 +751,7 @@ export function objectLiteralToStringEntry(
   data: object,
   between: string = ": ",
   newGroup: (entry: ObjectEntry) => Entry = (entry) =>
-    new GroupEntry(["{", true], entry, ["}", true]),
+    new GroupEntry([CommonStyled["{"], true], entry, [CommonStyled["}"], true], true),
   mapItem?: (key: string, value: any, item: ListEntry) => Entry,
 ): Entry {
   const result = new ObjectEntry(data);
@@ -667,13 +762,13 @@ export function objectLiteralToStringEntry(
   try {
     const important = Options.important(data);
     for (const [key, value] of formatEntries(data)) {
-      const k = fmt.raw(key);
+      const k = mapInput(key);
       const item = new ListEntry();
 
       item.push(important ? new StyleEntry(brightWhite, k) : k);
-      item.push(new ValueEntry(dim(between)));
+      item.push(rawStyle(dim, between));
       item.push(valueToColorStringEntry(value));
-      item.push(new TrailingEntry(","));
+      item.push(new TrailingEntry(CommonStyled[","]));
       result.push(mapItem ? mapItem(`${key}`, value, item) : item, [true, true]);
     }
   } finally {
@@ -708,13 +803,13 @@ export function arrayToStringEntry(
     for (const value of Object.values(data)) {
       const item = new ListEntry(false);
       item.push(valueToColorStringEntry(value), [true, false]);
-      item.push(new TrailingEntry(dim(",")), [false, true]);
+      item.push(new TrailingEntry(CommonStyled[","]), [false, true]);
       result.push(item);
     }
   } finally {
     ObjectStack.pop();
   }
-  return new GroupEntry(["[", false], result, ["]", false]);
+  return new GroupEntry([CommonStyled["["], false], result, [CommonStyled["]"], false], true);
 }
 
 export function formatFor<T>(value: any, fn: () => T): T {

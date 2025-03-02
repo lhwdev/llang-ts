@@ -1,4 +1,4 @@
-import { red } from "../../utils/colors.ts";
+import { red } from "../../utils/ansi.ts";
 import { fmt } from "../../utils/format.ts";
 import { debug } from "./debug.ts";
 

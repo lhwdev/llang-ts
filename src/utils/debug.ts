@@ -1,4 +1,4 @@
-import { dim, rgb8 } from "./colors.ts";
+import { dim, rgb8 } from "./ansi.ts";
 import { CstNode } from "../cst/CstNode.ts";
 import { Span } from "../token/Span.ts";
 import { GetSpanSymbol, type Spanned } from "../token/Spanned.ts";

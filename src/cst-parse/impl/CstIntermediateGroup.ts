@@ -4,7 +4,6 @@ import { CstImplicitNode, CstSpecialNode } from "../CstSpecialNode.ts";
 import { Span } from "../../token/Span.ts";
 import { GetSpanSymbol, type Spanned } from "../../token/Spanned.ts";
 import type { Token } from "../../token/Token.ts";
-import { dim, strikethrough } from "../../utils/colors.ts";
 import { isInherited } from "../../utils/extends.ts";
 import { fmt, formatClass, FormatEntries, type FormatEntry } from "../../utils/format.ts";
 import type { CstCodeContext } from "../CstCodeContext.ts";
