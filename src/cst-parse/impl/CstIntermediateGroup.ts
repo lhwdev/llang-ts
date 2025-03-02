@@ -1,6 +1,6 @@
 import { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
-import { CstImplicitNode, CstSpecialNode } from "../CstSpecialNode.ts";
+import { CstImplicitNode, CstPeekNode, CstSpecialNode } from "../CstSpecialNode.ts";
 import { Span } from "../../token/Span.ts";
 import { GetSpanSymbol, type Spanned } from "../../token/Spanned.ts";
 import type { Token } from "../../token/Token.ts";
@@ -8,21 +8,47 @@ import { isInherited } from "../../utils/extends.ts";
 import { fmt, formatClass, FormatEntries, type FormatEntry } from "../../utils/format.ts";
 import type { CstCodeContext } from "../CstCodeContext.ts";
 import type { ContextValue, CstNodeHintType, CstParseContext } from "../CstParseContext.ts";
-import type { ContextKey } from "../CstParseContext.ts";
-import { ContextKeys, getContext } from "../CstParseContext.ts";
-import { nullableNode } from "../inlineNode.ts";
-import { debug } from "./debug.ts";
+import { ContextKey, NodeHint, withContext } from "../CstParseContext.ts";
+import { ContextKeys, getContext, NodeHints } from "../CstParseContext.ts";
+import { debug, DebugFlags } from "./debug.ts";
 import type { CstCodeScope, CstCodeScopes } from "../tokenizer/CstCodeScope.ts";
 import { type CstCodeContextImpl, subscribeToken } from "./CstCodeContextImpl.ts";
 import { CstGroup, type CstGroupItem } from "./CstGroup.ts";
 import type { CstParseContextImpl } from "./CstParseContextImpl.ts";
 import { detailedParseError } from "./errors.ts";
+import {
+  CstChildParseContext,
+  type CstContextParent,
+  CstContextParentSymbol,
+  CstGroupParseContext,
+  type CstParseContextParent,
+} from "./CstGroupParseContext.ts";
 import type { CstParseIntrinsics } from "../CstParseIntrinsics.ts";
+import { getCallStackFrames, StackFrame } from "../../utils/errorStackParser.ts";
+import { stripAnsiCode } from "../../utils/ansi.ts";
 
 export const EmptySlot = Symbol("EmptySlot");
-export const DebugName = Symbol("DebugName");
+const DebugInternalPath = (() => {
+  const path = getCallStackFrames()[0].fileName!.split("/");
+  return path.slice(0, -2).join("/") + "/";
+})();
 
-export abstract class CstIntermediateGroup {
+export namespace InternalContextKeys {
+  export const InsideTest = new ContextKey<boolean>("Internal.InsideTest");
+}
+
+export class InsideTestError extends Error {
+  constructor(readonly reason?: Spanned) {
+    super();
+    this.stack = undefined;
+  }
+
+  override toString() {
+    return fmt.brightWhite("vital() inside intrinsics.testNode").s;
+  }
+}
+
+export abstract class CstIntermediateGroup implements CstParseIntrinsics {
   readonly spanStart: number;
   spanEnd: number;
   declare snapshot?: unknown; // tokenizer(offset = spanStart)
@@ -35,13 +61,15 @@ export abstract class CstIntermediateGroup {
   declare isImplicit?: boolean;
 
   declare contextValues?: ContextValue<any>[];
-  contextualNode: CstIntermediateGroup;
+  contextualNode: CstIntermediateGroup; // note: in some cases, contextualNode === this
 
   group?: CstGroup;
   declare error?: unknown | null;
 
   declare debugInitialized?: boolean;
   declare debugName?: string;
+  declare debugNodeName?: string;
+  declare debugParserLocation?: StackFrame;
 
   constructor(
     readonly parent: CstIntermediateGroup,
@@ -53,21 +81,42 @@ export abstract class CstIntermediateGroup {
     this.contextualNode = parent.contextualNode;
 
     if (parent.isImplicit) this.isImplicit = true;
+
+    if ("Deno" in globalThis && DebugFlags.traceParser) {
+      const frames = getCallStackFrames();
+      const location = frames.find((frame) => {
+        return frame.fileName?.startsWith(DebugInternalPath) === false;
+      });
+      this.debugParserLocation = location;
+    }
   }
 
   parentForPop() {
     return this.parent;
   }
 
+  get contextualParent(): CstIntermediateGroup {
+    return this.contextualNode.parent;
+  }
+
   protected get c(): CstCodeContextImpl {
     return (getContext() as CstParseContextImpl<any>).c;
   }
 
-  withSelf<R>(fn: () => R): R {
-    // stub
-    const context = getContext() as any;
-    if (!("withCurrent" in context)) throw new Error("only compatible for CstParseContextImpl");
-    return context.withCurrent(this, fn);
+  withSelf<R>(fn: (self: this) => R): R {
+    const context = getContext();
+    const newFn = fn.length === 0 ? fn as () => R : () => fn(this);
+    if (context instanceof CstGroupParseContext) {
+      return context.withCurrent(this, newFn);
+    }
+
+    if (!(CstContextParentSymbol in context)) {
+      throw new Error("parent context is not CstContextParent");
+    }
+    return withContext(
+      CstChildParseContext.create(context as unknown as CstContextParent, this),
+      newFn,
+    );
   }
 
   /// Debug
@@ -172,9 +221,13 @@ export abstract class CstIntermediateGroup {
         break;
 
       default: {
-        if (typeof hint === "object") {
-          if (DebugName in hint) {
-            this.debugName = `${hint[DebugName]}`;
+        if (hint instanceof NodeHint) {
+          if (hint instanceof NodeHints.DebugName) {
+            this.debugName = `${hint.value}`;
+            return;
+          }
+          if (hint instanceof NodeHints.DebugNodeName) {
+            this.debugNodeName = `${hint.value}`;
             return;
           }
         }
@@ -300,6 +353,101 @@ export abstract class CstIntermediateGroup {
 
   /// Children management
 
+  private debugNodeDebugLine(
+    info: CstNodeInfo<any>,
+    child: () => CstIntermediateGroup | null,
+  ): FormatEntry {
+    return fmt.lazy((context) => {
+      const c = child();
+      const kind = c?.isImplicit ? "Implicit Node" : "Node";
+      let kindEntry = context?.error !== undefined
+        ? fmt.bgBlack(fmt.cyan(fmt.strikethrough(kind)))
+        : fmt.cyan(kind);
+      if (context.dim) kindEntry = fmt.italic(kindEntry);
+
+      if (c?.isImplicit) {
+        return fmt`${kindEntry} ➜  ${(c.group?.node as CstImplicitNode)?.node}`;
+      }
+
+      let name: FormatEntry | null = null;
+      let type: FormatEntry | null;
+      let frame: StackFrame | null = null;
+      // let link;
+      let isAccessor = false;
+
+      if (!c) {
+        // fallback; never happens I guess
+        type = fmt.rgb8(info.name, 146);
+      } else {
+        frame = c.debugParserLocation ?? null;
+        // find function name
+        if (c.debugName) {
+          name = fmt.raw(c.debugName);
+        } else if (frame) {
+          let parser = frame.functionName;
+          if (parser) {
+            parser = stripAnsiCode(parser);
+            const afterDot = parser.lastIndexOf(".") + 1;
+            const propertyName = parser.slice(afterDot);
+            if (propertyName.startsWith("get ") || propertyName.startsWith("set ")) {
+              isAccessor = true;
+              parser = parser.slice(0, afterDot) + propertyName.slice(4);
+            }
+            name = fmt.raw(parser);
+            if (afterDot == 0 && frame.typeName) {
+              name = fmt`${fmt.gray`${fmt.raw(frame.typeName)}.`}${name}`;
+            }
+          }
+        }
+
+        const typeName = `${info.name}`;
+        type = fmt.rgb8(typeName, 146);
+        if (c.debugNodeName) {
+          const debug = c.debugNodeName;
+          if (info === CstNode) {
+            type = fmt.rgb8(fmt.italic(debug), 146);
+          } else if (debug.startsWith(typeName)) {
+            type = fmt`${type}${fmt.italic(debug.slice(typeName.length))}`;
+          } else {
+            type = fmt`${type} ${fmt.italic(debug)}`;
+          }
+        }
+      }
+
+      if (isInherited(info, CstSpecialNode)) {
+        if (name) {
+          name = fmt.italic(name);
+        } else {
+          type = fmt.italic(type);
+        }
+      }
+
+      // file: protocol is not yet supported by vscode
+      // if (link && name) {
+      //   name = fmt.link(name, link);
+      // }
+
+      let summary;
+      if (name) {
+        if (isAccessor) {
+          summary = fmt`${name}${fmt.gray(":")} ${type}`;
+        } else {
+          // note that frame.function will always null, as strict mode is on.
+          const args = frame?.function?.length ? "..." : "";
+          summary = fmt`${name}${fmt.gray(`(${fmt.raw(args)}):`)} ${type}`;
+        }
+      } else {
+        summary = type;
+      }
+
+      const result = c?.error !== undefined
+        ? c.error === null ? fmt.dim`null` : fmt`${fmt.red(`${c.error}`)}`
+        : fmt``;
+
+      return fmt`${kindEntry} ${summary} ➜  ${result}`.s;
+    });
+  }
+
   beginChild(info: CstNodeInfo<any>): CstIntermediateGroup {
     // beginChild -> to consider: special nodes, implicit, debug
     // end -> to consider: special nodes, update implicit state, update span,
@@ -307,46 +455,15 @@ export abstract class CstIntermediateGroup {
     this.ensureInitialized();
 
     let child: CstIntermediateGroup | null;
-
-    const kind = this.isImplicit ? dim("Implicit Node") : "Node";
-    debug.raw(fmt.lazy((c) => {
-      const kindEntry = child?.error !== undefined
-        ? fmt.bgBlack(fmt.cyan(strikethrough(kind)))
-        : fmt.cyan(kind);
-      let name;
-      const original = `${info.name}`;
-      const originalStyled = isInherited(info, CstSpecialNode)
-        ? fmt.rgb8(original, 182)
-        : fmt.raw(original);
-      if (child?.debugName) {
-        const debug = child.debugName;
-        if (info === CstNode) {
-          name = fmt.italic(debug);
-        } else if (debug.startsWith(original)) {
-          name = fmt`${originalStyled}${fmt.italic(debug.slice(original.length))}`;
-        } else {
-          name = fmt`${originalStyled} ${fmt.italic(debug)}`;
-        }
-      } else {
-        name = originalStyled;
-      }
-      let result;
-      if (isInherited(info, CstImplicitNode)) {
-        result = fmt`${child?.group?.node ?? fmt.raw`?`}`;
-      } else {
-        result = child?.error !== undefined
-          ? child.error === null ? fmt.dim`null` : fmt`${fmt.red(`${child.error}`)}`
-          : fmt``;
-      }
-
-      return fmt`${c.dim ? fmt.dim(kindEntry) : kindEntry} ${name} ➜  ${result}`.s;
-    }));
+    const debugBegin = this.debugNodeDebugLine(info, () => child);
 
     if (child = this.beginSpecialNode(info)) {
+      debug.raw(debugBegin);
       return child;
     }
 
     this.handleImplicit();
+    debug.raw(debugBegin);
 
     child = this.createSpecialChild(info);
     if (!child) {

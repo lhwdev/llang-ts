@@ -7,7 +7,11 @@ import type { useImplicitNode } from "../intrinsics.ts";
 import type { CstCodeScopes } from "../tokenizer/CstCodeScope.ts";
 import type { CstTokenizerContext } from "../tokenizer/CstTokenizerContext.ts";
 import { CstCodeContextImpl } from "./CstCodeContextImpl.ts";
-import { type CstContextParent, CstGroupParseContext } from "./CstGroupParseContext.ts";
+import {
+  type CstContextParent,
+  CstContextParentSymbol,
+  CstGroupParseContext,
+} from "./CstGroupParseContext.ts";
 import type { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
 import { CstIntermediateRoot } from "./CstIntermediateRoot.ts";
 
@@ -25,7 +29,7 @@ export class CstParseContextImpl<Node extends CstNode> extends CstGroupParseCont
         this.context.current.debugLog(entry);
       },
     };
-    this.parent = { c, debug };
+    this.parent = { [CstContextParentSymbol]: true, c, debug };
     this.current = new CstIntermediateRoot(null);
   }
 

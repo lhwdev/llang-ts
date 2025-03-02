@@ -14,3 +14,7 @@ export namespace debug {
     raw(new FormatEntries.value(str));
   }
 }
+
+export const DebugFlags = {
+  traceParser: true,
+};
