@@ -67,6 +67,7 @@ export abstract class CstIntermediateGroup implements CstParseIntrinsics {
   declare error?: unknown | null;
 
   declare debugInitialized?: boolean;
+  declare debugHideLog?: boolean;
   declare debugName?: string;
   declare debugNodeName?: string;
   declare debugParserLocation?: StackFrame;
@@ -228,6 +229,13 @@ export abstract class CstIntermediateGroup implements CstParseIntrinsics {
           }
           if (hint instanceof NodeHints.DebugNodeName) {
             this.debugNodeName = `${hint.value}`;
+            return;
+          }
+          if (hint instanceof NodeHints.DebugImportance) {
+            switch (hint.value) {
+              case "hide":
+                this.debugHideLog = true;
+            }
             return;
           }
         }
@@ -444,7 +452,11 @@ export abstract class CstIntermediateGroup implements CstParseIntrinsics {
         ? c.error === null ? fmt.dim`null` : fmt`${fmt.red(`${c.error}`)}`
         : fmt``;
 
-      return fmt`${kindEntry} ${summary} ➜  ${result}`.s;
+      let line = fmt`${kindEntry} ${summary} ➜  ${result}`;
+      if (this.debugHideLog && !c?.error) {
+        line = FormatEntries.list.from([line, fmt`aaa ➜  `], true);
+      }
+      return line;
     });
   }
 
@@ -663,7 +675,7 @@ export abstract class CstIntermediateGroup implements CstParseIntrinsics {
     // do nothing
 
     const lines = from.debugLines;
-    if (lines && !from.isImplicit) {
+    if (lines && !from.isImplicit && !from.debugHideLog) {
       if (this.parent === this) {
         lines.forEach(([depth, line, isDim]) => {
           const indent = "  ".repeat(depth);

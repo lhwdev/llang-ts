@@ -176,7 +176,7 @@ export function dumpNodeEntries(node: CstNode): ReadonlyArray<readonly [any, any
             continue;
           }
           if (propertySpan.end < treeSpan.end) {
-            throw new Error("TODO");
+            // throw new Error("TODO");
           }
           // propertySpan.end > treeSpan.end
           // in case of SpanGroup, property may span over multiple tree spans
@@ -209,7 +209,14 @@ export function dumpNodeEntries(node: CstNode): ReadonlyArray<readonly [any, any
       }
 
       if (skipped.size) {
-        errors.push(fmt`skipped ${fmt.raw(skipped.values().toArray().join())}`);
+        const skippedList = skipped.values()
+          .toArray()
+          .map((s) => {
+            const target = s instanceof CstTree ? s.node : s;
+            return fmt`${fmt.raw(target.constructor.name)} at ${s[GetSpanSymbol].dumpSimple()}`;
+          })
+          .join();
+        errors.push(fmt`skipped ${fmt.raw(skippedList)}`);
       }
       if (discontinuous.length) {
         errors.push(fmt`spans discontinuous at ${fmt.raw(discontinuous.join(", "))}`);
@@ -256,7 +263,7 @@ export function formatNodeName(node: CstNode): FormatEntry {
   let name = node.constructor.name;
   if (!name) name = Object.getPrototypeOf(node).constructor.name;
 
-  return fmt.rgb8(name, 19);
+  return fmt.rgb8(name, 111);
 }
 
 export function tokenKindNames(kind: TokenKind): string[] {

@@ -303,7 +303,13 @@ type Prop = { entry: Entry; space: [boolean | null, boolean | null] };
 class ListEntry extends Entry {
   props: Prop[] = [];
 
-  constructor(readonly defaultSpace: boolean = false) {
+  static from(items: Entry[], wrap: boolean = false): ListEntry {
+    const list = new ListEntry(wrap);
+    for (const item of items) list.push(item);
+    return list;
+  }
+
+  constructor(readonly wrap: boolean = false) {
     super();
   }
 
@@ -325,7 +331,15 @@ class ListEntry extends Entry {
   }
 
   override multiLine(output: MultiLineOutput): void {
-    for (const prop of this.props) prop.entry.multiLine(output);
+    let isFirst = true;
+    for (const prop of this.props) {
+      prop.entry.multiLine(output);
+      if (isFirst) {
+        isFirst = false;
+      } else if (this.wrap) {
+        output.last = true;
+      }
+    }
   }
 }
 
@@ -801,7 +815,7 @@ export function arrayToStringEntry(
 
   try {
     for (const value of Object.values(data)) {
-      const item = new ListEntry(false);
+      const item = new ListEntry();
       item.push(valueToColorStringEntry(value), [true, false]);
       item.push(new TrailingEntry(CommonStyled[","]), [false, true]);
       result.push(item);

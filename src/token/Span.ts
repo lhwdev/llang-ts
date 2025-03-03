@@ -1,4 +1,4 @@
-import { fmt } from "../utils/format.ts";
+import { fmt, type FormatEntry } from "../utils/format.ts";
 import { GetSpanSymbol, type Spanned } from "./Spanned.ts";
 
 /**
@@ -27,6 +27,14 @@ export class Span implements Spanned {
 
   equals(other: Span) {
     return this.start === other.start && this.end === other.end;
+  }
+
+  dump(): FormatEntry {
+    return fmt.classLike("Span", fmt`${this.start}..<${this.end}`);
+  }
+
+  dumpSimple(): FormatEntry {
+    return fmt.gray`[${this.start}, ${this.end})`;
   }
 
   toString() {

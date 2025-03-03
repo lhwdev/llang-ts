@@ -24,7 +24,7 @@ import { CstArray } from "../../cst/CstArray.ts";
 import { nullableNode, peek } from "../inlineNode.ts";
 import { detailedParseError } from "./errors.ts";
 import { fmt } from "../../utils/format.ts";
-import { type CstNodeHintType, NodeHint } from "../CstParseContext.ts";
+import { type CstNodeHintType, NodeHint, NodeHints } from "../CstParseContext.ts";
 import { CstConstraintNodeRoot } from "../CstSpecialNode.ts";
 import { intrinsics } from "../intrinsics.ts";
 
@@ -107,6 +107,7 @@ export class CstIntermediateConstraints extends CstIntermediateNode {
         chain.onResolved(node);
       }
     });
+    this.constraintsResolved = true;
   }
 
   override code<R>(_scope: CstCodeScope, _fn: (code: CstCodeContext) => R): R {
@@ -450,6 +451,7 @@ class ConstraintChain extends ConstraintChainNext {
     if (this.value) throw new Error("already resolved");
     return nullableNode(this.c.info, () => {
       try {
+        intrinsics.debugName("cstConstraint");
         intrinsics.debugNodeName(this.name);
         intrinsics.hintSelf(new ConstraintChainMarker(this));
         return this.c.resolve(this.next.asNext);
@@ -478,6 +480,7 @@ class ConstraintChain extends ConstraintChainNext {
   override asNext: ConstraintNext = Object.assign(() =>
     intrinsics.testNode(() => {
       intrinsics.debugName(`${this.c.info.name}.asNext`);
+      intrinsics.hintSelf(new NodeHints.DebugImportance("hide"));
       return this.c.test(this.next.asNext);
     }), {
     expectError: () => {
