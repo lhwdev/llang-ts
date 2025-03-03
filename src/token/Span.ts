@@ -38,6 +38,25 @@ export class Span implements Spanned {
   }
 
   toString() {
-    return fmt.classLike("Span", fmt`${this.start}..<${this.end}`).s;
+    this.dump().s;
+  }
+
+  /// Utilities
+
+  static checkContinuous(spans: Spanned[]) {
+    if (!spans.length) return;
+    let offset = spans[0][GetSpanSymbol].end;
+    for (let index = 1; index < spans.length; index++) {
+      const item = spans[index];
+      const span = item[GetSpanSymbol];
+      if (span.start !== offset) {
+        throw new Error(
+          fmt`Span not continuous; spans[${index - 1}]=${
+            spans[index - 1][GetSpanSymbol].dumpSimple()
+          }, spans[${index}]=${span.dumpSimple()}`.s,
+        );
+      }
+      offset = span.end;
+    }
   }
 }

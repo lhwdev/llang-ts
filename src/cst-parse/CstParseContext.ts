@@ -69,6 +69,10 @@ export namespace NodeHints {
   export class DebugNodeName extends NodeHint<string> {
     declare private debugNodeName: void;
   }
+
+  export class DebugImportance extends NodeHint<"hide"> {
+    declare private debugNodeName: void;
+  }
 }
 
 export class ContextKey<T> {
