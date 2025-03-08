@@ -1,7 +1,7 @@
 import { type FormatEntry, FormatObjectEntries, formatRaw, objectToStringEntry } from "./format.ts";
 
 export function inspectFully(obj: object, self: object = obj): FormatEntry {
-  const keys = [...Object.getOwnPropertyNames(obj), ...Object.getOwnPropertySymbols(obj)];
+  const keys = Reflect.ownKeys(obj);
   return formatRaw({ handleObject: (o) => inspectFully(o, self) }, () =>
     objectToStringEntry({
       [FormatObjectEntries]: [

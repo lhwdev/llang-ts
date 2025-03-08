@@ -20,10 +20,7 @@ export class CstNode implements Spanned {
   /// Utilities
   copy(newTree: CstTree = this.tree): this {
     const newNode = {} as any;
-    for (const key of Object.getOwnPropertyNames(this)) {
-      newNode[key] = (this as any)[key];
-    }
-    for (const key of Object.getOwnPropertySymbols(this)) {
+    for (const key of Reflect.ownKeys(this)) {
       newNode[key] = (this as any)[key];
     }
     newNode.tree = newTree;
@@ -74,11 +71,8 @@ export class CstNode implements Spanned {
     };
 
     const newNode = {} as any;
-    for (const key of Object.getOwnPropertyNames(this)) {
+    for (const key of Reflect.ownKeys(this)) {
       if (key === "tree") continue;
-      newNode[key] = this.mapOwnProperty((this as any)[key], mapItem);
-    }
-    for (const key of Object.getOwnPropertySymbols(this)) {
       newNode[key] = this.mapOwnProperty((this as any)[key], mapItem);
     }
     newNode.tree = this.tree;

@@ -795,7 +795,7 @@ export function formatEntries(data: object): ReadonlyArray<readonly [any, any]> 
   if (FormatObjectEntries in data) {
     return data[FormatObjectEntries] as any;
   }
-  const keys = [...Object.getOwnPropertyNames(data), ...Object.getOwnPropertySymbols(data)];
+  const keys = Reflect.ownKeys(data);
   const entries: (readonly [any, any])[] = [];
   for (const key of keys) {
     const prop = Object.getOwnPropertyDescriptor(data, key);
