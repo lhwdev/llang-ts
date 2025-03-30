@@ -20,7 +20,7 @@ import type { CstCodeScope } from "../tokenizer/CstCodeScope.ts";
 import type { CstGroup } from "./CstGroup.ts";
 import type { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
 import { CstIntermediateNode } from "./CstIntermediateNode.ts";
-import { CstArray } from "../../cst/CstArray.ts";
+import { CstMutableList } from "../../cst-parse/CstMutableList.ts";
 import { nullableNode, peek } from "../inlineNode.ts";
 import { detailedParseError } from "./errors.ts";
 import { fmt } from "../../utils/format.ts";
@@ -265,7 +265,7 @@ export class RepeatConstraint extends Constraint<CstRepeatNodeInfo<CstNode>> {
   override resolve(next: ConstraintNext): CstRepeatNode<CstNode> {
     const { element, direction, limit: [min, max], separator } = this.props;
 
-    const result = new CstArray<CstNode>();
+    const result = CstMutableList<CstNode>();
 
     const consume = () =>
       nullableNode(CstNode, () => {
@@ -347,7 +347,7 @@ export class RepeatConstraint extends Constraint<CstRepeatNodeInfo<CstNode>> {
   override test(next: ConstraintNext): boolean {
     const { element, direction, limit: [min, max], separator } = this.props;
 
-    const result = new CstArray<CstNode>();
+    const result = CstMutableList<CstNode>();
 
     const consume = () =>
       nullableNode(CstNode, () => {

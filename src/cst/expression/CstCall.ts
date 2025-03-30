@@ -4,7 +4,7 @@ import { CstNode } from "../CstNode.ts";
 import type { CstTypeArguments } from "../type/CstTypeArguments.ts";
 import { CstExpression } from "./CstExpression.ts";
 import type { CstLambdaExpression } from "./CstFunctionExpression.ts";
-import type { CstReadonlyArray } from "../CstArray.ts";
+import type { CstList } from "../CstList.ts";
 
 export class CstCall extends CstExpression {
   declare private $call: void;
@@ -54,7 +54,7 @@ export class CstValueArguments extends CstNode {
   declare private $valueArguments: void;
 
   constructor(
-    readonly items: CstReadonlyArray<CstValueArgumentItem>,
+    readonly items: CstList<CstValueArgumentItem>,
   ) {
     super();
   }

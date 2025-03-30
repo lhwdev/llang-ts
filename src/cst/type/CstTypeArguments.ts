@@ -1,14 +1,14 @@
 import type { Token } from "../../token/Token.ts";
 import type { Tokens } from "../../token/Tokens.ts";
 import { CstNode } from "../CstNode.ts";
-import type { CstReadonlyArray } from "../CstArray.ts";
+import type { CstList } from "../CstList.ts";
 import type { CstType } from "./CstType.ts";
 
 export class CstTypeArguments extends CstNode {
   declare private $typeArguments: void;
 
   constructor(
-    readonly items: CstReadonlyArray<CstTypeArgumentItem>,
+    readonly items: CstList<CstTypeArgumentItem>,
   ) {
     super();
   }

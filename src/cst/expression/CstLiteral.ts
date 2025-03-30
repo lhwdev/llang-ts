@@ -1,6 +1,6 @@
 import type { Token } from "../../token/Token.ts";
 import { Tokens } from "../../token/Tokens.ts";
-import type { CstReadonlyArray } from "../CstArray.ts";
+import type { CstList } from "../CstList.ts";
 import { CstExpression } from "./CstExpression.ts";
 
 export abstract class CstLiteral extends CstExpression {
@@ -43,7 +43,7 @@ export class CstStringLiteral extends CstConstLiteral {
   readonly value: string;
 
   constructor(
-    readonly items: CstReadonlyArray<CstStringTemplateText>,
+    readonly items: CstList<CstStringTemplateText>,
   ) {
     super();
     this.value = items.map((item) => {
@@ -83,7 +83,7 @@ export class CstStringTemplate extends CstLiteral {
   declare private $stringTemplate: void;
 
   constructor(
-    readonly items: CstReadonlyArray<CstStringTemplateItem>,
+    readonly items: CstList<CstStringTemplateItem>,
   ) {
     super();
   }

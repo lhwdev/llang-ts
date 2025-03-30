@@ -1,4 +1,3 @@
-import { type CstReadonlyArray, type CstReadonlyTuple, CstTuple } from "../CstArray.ts";
 import { CstExpression } from "./CstExpression.ts";
 import type { CstBinaryOperator, CstOperator, CstUnaryOperator } from "./CstOperator.ts";
 
@@ -6,7 +5,7 @@ export abstract class CstOperation extends CstExpression {
   declare private $operation: void;
   abstract readonly operator: CstOperator;
 
-  abstract readonly operand: CstReadonlyArray<CstExpression>;
+  abstract readonly operand: CstExpression[];
 }
 
 export class CstBinaryOperation extends CstOperation {
@@ -20,8 +19,8 @@ export class CstBinaryOperation extends CstOperation {
     super();
   }
 
-  override get operand(): CstReadonlyTuple<[CstExpression, CstExpression]> {
-    return new CstTuple(this.lhs, this.rhs);
+  override get operand(): [CstExpression, CstExpression] {
+    return [this.lhs, this.rhs];
   }
 }
 
@@ -35,7 +34,7 @@ export class CstUnaryOperation extends CstOperation {
     super();
   }
 
-  override get operand(): CstReadonlyTuple<[CstExpression]> {
-    return new CstTuple(this.expr);
+  override get operand(): [CstExpression] {
+    return new [this.expr]();
   }
 }

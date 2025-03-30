@@ -1,4 +1,4 @@
-import type { CstReadonlyArray } from "../cst/CstArray.ts";
+import type { CstList } from "../cst/CstList.ts";
 import type { CstNode } from "../cst/CstNode.ts";
 import type { CstNodeConstructor, CstNodeInfo } from "../cst/CstNodeInfo.ts";
 import { fmt } from "../utils/format.ts";
@@ -138,7 +138,7 @@ export class ConstraintRepeatScope {
   private invokeFn<Node extends CstNode>(
     direction: CstRepeatNodeProps<Node>["direction"],
     fn: RepeatNodeFn<Node>,
-  ): LazyValue<CstReadonlyArray<Node>> {
+  ): LazyValue<CstList<Node>> {
     const info = memoize(() =>
       constraintNodeInfo(
         CstRepeatNode<Node>,
@@ -149,15 +149,15 @@ export class ConstraintRepeatScope {
       .map((node) => node.items);
   }
 
-  invoke<Node extends CstNode>(fn: RepeatNodeFn<Node>): LazyValue<CstReadonlyArray<Node>> {
+  invoke<Node extends CstNode>(fn: RepeatNodeFn<Node>): LazyValue<CstList<Node>> {
     return this.invokeFn("even", fn);
   }
 
-  invokeMinimum<Node extends CstNode>(fn: RepeatNodeFn<Node>): LazyValue<CstReadonlyArray<Node>> {
+  invokeMinimum<Node extends CstNode>(fn: RepeatNodeFn<Node>): LazyValue<CstList<Node>> {
     return this.invokeFn("min", fn);
   }
 
-  invokeMaximum<Node extends CstNode>(fn: RepeatNodeFn<Node>): LazyValue<CstReadonlyArray<Node>> {
+  invokeMaximum<Node extends CstNode>(fn: RepeatNodeFn<Node>): LazyValue<CstList<Node>> {
     return this.invokeFn("max", fn);
   }
 }
@@ -227,7 +227,7 @@ export type CstMaybeNodeInfo<Node extends CstNode> = CstConstraintNodeInfo<
 export class CstRepeatNode<Node extends CstNode> extends CstConstraintNode {
   declare private $special_constraint_repeat: void;
 
-  constructor(readonly items: CstReadonlyArray<Node>) {
+  constructor(readonly items: CstList<Node>) {
     super();
   }
 }

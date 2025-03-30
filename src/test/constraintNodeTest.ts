@@ -4,16 +4,16 @@ import {
   cstNumberLiteralOrNull,
   cstStringTemplateOrNull,
 } from "../cst-parser/expression/cstLiteral.ts";
-import type { CstReadonlyArray } from "../cst/CstArray.ts";
+import type { CstList } from "../cst/CstList.ts";
 import { CstNode } from "../cst/CstNode.ts";
 import { testCstParse } from "./common.ts";
 
 const testCode = `
-1 2 3 "hello!"
+1 /*ho*/ 2 3 "hello!"
 `;
 
 class CoolNode extends CstNode {
-  constructor(readonly args: CstReadonlyArray<CstNode>, readonly body: CstNode) {
+  constructor(readonly args: CstList<CstNode>, readonly body: CstNode) {
     super();
   }
 }

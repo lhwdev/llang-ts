@@ -26,6 +26,8 @@ import {
 import type { CstParseIntrinsics } from "../CstParseIntrinsics.ts";
 import { getCallStackFrames, StackFrame } from "../../utils/errorStackParser.ts";
 import { stripAnsiCode } from "../../utils/ansi.ts";
+import type { CstMutableList, CstMutableListInternal } from "../CstMutableList.ts";
+import { CstTree } from "../../cst/CstTree.ts";
 
 export const EmptySlot = Symbol("EmptySlot");
 const DebugInternalPath = (() => {
@@ -271,6 +273,38 @@ export abstract class CstIntermediateGroup implements CstParseIntrinsics {
   }
 
   /// Intrinsics
+
+  intrinsicListCreated<T extends Spanned>(list: CstMutableListInternal<T>): CstMutableList<T> {
+    return list;
+  }
+
+  intrinsicListPushItem<T extends Spanned>(list: CstMutableListInternal<T>, item: T): void {
+    const tree = this.items.at(-1);
+    if (!tree || tree.span !== item[GetSpanSymbol]) {
+      throw detailedParseError`
+        Expected last child item of this(${this.info}) to have identical span as given item.
+        - ${fmt.brightYellow("last child item")}: ${this.items.at(-1)}
+        - ${fmt.brightYellow("given item")}: ${item}
+      `;
+    }
+    if (list.length > 0) {
+      const maybeImplicit = this.items.at(-2);
+      if (maybeImplicit instanceof CstTree && maybeImplicit.node instanceof CstImplicitNode) {
+        if (list.at(-1)![GetSpanSymbol].end === maybeImplicit.span.start) {
+          list.implicitList.push(maybeImplicit.node);
+        } else {
+          throw detailedParseError`
+            Span not continuous: ${list.at(-1)?.[GetSpanSymbol].dumpSimple()} -> \\
+            ${maybeImplicit.span.dumpSimple()} -> ${item[GetSpanSymbol].dumpSimple()}
+            - ${fmt.brightYellow("CstMutableList.at(-1)")}: ${list.at(-1)}
+            - ${fmt.brightYellow("items.at(-2)")}: ${maybeImplicit}
+            - ${fmt.brightYellow("given item for CstMutableList.push()")}: ${item}
+          `;
+        }
+      }
+    }
+    list.pushInternal(item);
+  }
 
   intrinsicTestNode(node: () => CstNode | boolean | null): boolean {
     return !!this.beginChild(CstPeekNode).withSelf((child) => {

@@ -1,3 +1,4 @@
+import { CstMutableList } from "../cst-parse/CstMutableList.ts";
 import { code, codeScopes, useImplicitNode } from "../cst-parse/intrinsics.ts";
 import { nullableParser, parser } from "../cst-parse/parser.ts";
 import {
@@ -8,7 +9,6 @@ import {
   CstLineComment,
   CstWhitespace,
 } from "../cst/CstImplicit.ts";
-import { CstArray } from "../cst/CstArray.ts";
 import type { Token } from "../token/Token.ts";
 import { Tokens } from "../token/Tokens.ts";
 
@@ -30,7 +30,7 @@ export const cstImplicitOrNull = nullableParser(CstImplicit, () => {
     switch (kind.type) {
       case "docBlock":
       case "block": {
-        const content = new CstArray<Token<Tokens.Comment | Tokens.LineBreak>>();
+        const content = CstMutableList<Token<Tokens.Comment | Tokens.LineBreak>>();
         while (true) {
           const next = code(scope, (c) => c.next());
           if (next.is(Tokens.Comment.Begin)) {
@@ -52,7 +52,7 @@ export const cstImplicitOrNull = nullableParser(CstImplicit, () => {
         }
       }
       case "line": {
-        const content = new CstArray<Token<Tokens.Comments.Line.Content>>();
+        const content = CstMutableList<Token<Tokens.Comments.Line.Content>>();
         while (true) {
           const next = code(scope, (c) => c.next());
           if (next.is(Tokens.LineBreak)) {
@@ -74,7 +74,7 @@ export const cstImplicitOrNull = nullableParser(CstImplicit, () => {
 });
 
 export const cstImplicitList = parser(CstImplicitList, () => {
-  const list = new CstArray<CstImplicit>();
+  const list = CstMutableList<CstImplicit>();
   while (true) {
     const node = cstImplicitOrNull();
     if (!node) break;

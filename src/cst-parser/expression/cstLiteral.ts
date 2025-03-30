@@ -1,7 +1,7 @@
 import { node } from "../../cst-parse/inlineNode.ts";
 import { code, codeScopes, intrinsics } from "../../cst-parse/intrinsics.ts";
 import { nullableParser, parser } from "../../cst-parse/parser.ts";
-import { CstArray } from "../../cst/CstArray.ts";
+import { CstMutableList } from "../../cst-parse/CstMutableList.ts";
 import {
   CstBooleanLiteral,
   CstNumberLiteral,
@@ -47,7 +47,7 @@ export const cstStringTemplateOrNull = nullableParser(CstStringTemplate, () => {
 
   const kind = left.kind.kind;
   const scope = codeScopes.stringLiteral(kind);
-  const items = new CstArray<CstStringTemplateItem>();
+  const items = CstMutableList<CstStringTemplateItem>();
   while (true) {
     const next = code(scope, (c) => c.peek());
     if (next.is(Tokens.Literal.String.Text)) {

@@ -2,7 +2,7 @@ import type { Token } from "../token/Token.ts";
 import { Tokens } from "../token/Tokens.ts";
 import { dumpNodeEntry, formatNodeName } from "../utils/debug.ts";
 import { fmt, format } from "../utils/format.ts";
-import type { CstReadonlyArray } from "./CstArray.ts";
+import type { CstList } from "./CstList.ts";
 import { CstNode } from "./CstNode.ts";
 
 export class CstImplicit extends CstNode {
@@ -28,7 +28,7 @@ export class CstLineBreak extends CstWs {
 export abstract class CstComment extends CstImplicit {
   declare private $comment: void;
   abstract readonly kind: Tokens.Comments.Kind;
-  abstract readonly content: CstReadonlyArray<Token<Tokens.Comment.Content | Tokens.LineBreak>>;
+  abstract readonly content: CstList<Token<Tokens.Comment.Content | Tokens.LineBreak>>;
 }
 
 export class CstBlockComment extends CstComment {
@@ -36,7 +36,7 @@ export class CstBlockComment extends CstComment {
 
   constructor(
     override readonly kind: Tokens.Comments.Kind,
-    override readonly content: CstReadonlyArray<Token<Tokens.Comment.Content | Tokens.LineBreak>>,
+    override readonly content: CstList<Token<Tokens.Comment.Content | Tokens.LineBreak>>,
   ) {
     super();
   }
@@ -50,7 +50,7 @@ export class CstLineComment extends CstComment {
   declare private $lineComment: void;
 
   constructor(
-    override readonly content: CstReadonlyArray<Token<Tokens.Comment.Content>>,
+    override readonly content: CstList<Token<Tokens.Comment.Content>>,
   ) {
     super();
   }
@@ -64,7 +64,7 @@ export class CstImplicitList extends CstImplicit {
   declare private $implicitList: void;
 
   constructor(
-    readonly items: CstReadonlyArray<CstImplicit>,
+    readonly items: CstList<CstImplicit>,
   ) {
     super();
   }
