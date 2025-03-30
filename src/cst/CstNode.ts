@@ -5,6 +5,7 @@ import { fmt, format, FormatObjectEntries, ToFormatString } from "../utils/forma
 import { type CstParseContext, getContext, withContext } from "../cst-parse/CstParseContext.ts";
 import { CstTree, type CstTreeItem } from "./CstTree.ts";
 import { Token } from "../token/Token.ts";
+import { detailedError } from "../common/error.ts";
 
 export class CstNode implements Spanned {
   tree: CstTree<this> = getContext().beforeEnd(this) as CstTree<this>;
@@ -20,8 +21,8 @@ export class CstNode implements Spanned {
   /// Utilities
   copy(newTree: CstTree = this.tree): this {
     const newNode = {} as any;
-    for (const key of Reflect.ownKeys(this)) {
-      newNode[key] = (this as any)[key];
+    for (const [key, value] of this.getOwnProperties()) {
+      newNode[key] = value;
     }
     newNode.tree = newTree;
     Object.setPrototypeOf(newNode, Object.getPrototypeOf(this));
@@ -39,6 +40,77 @@ export class CstNode implements Spanned {
 
     Object.setPrototypeOf(context, getContext());
     return withContext(context as unknown as CstParseContext, () => fn(this));
+  }
+
+  walkEach(
+    fn: (
+      item: CstTreeItem,
+      property: { key: PropertyKey; value: Spanned; groupIndex?: number } | null,
+    ) => void,
+  ): void {
+    const tree = this.tree;
+    const items = tree.shadowedGroups ? tree.shadowedGroups.at(-1)!.items : tree.items;
+    const properties: ({ key: PropertyKey; value: Spanned; groupIndex?: number } | null)[] = Array(
+      items.length,
+    );
+
+    for (const entry of this.getOwnProperties()) {
+      const [key, value] = entry;
+      const findIndex = (property: Spanned) => {
+        const span = property[GetSpanSymbol];
+        for (const [index, item] of items.entries()) {
+          if (span.start <= item.span.start) {
+            if (!span.equals(item.span)) console.error("span mismatch", span, item);
+            return index;
+          }
+        }
+        return null;
+      };
+      const addProperty = (key: PropertyKey, property: Spanned) => {
+        const index = findIndex(property);
+        if (!index) {
+          detailedError`
+            ${fmt.symbol("property.span.start")} > ${fmt.symbol("this.span.start")}
+            - ${fmt.brightYellow("property")} = ${property}
+            - ${fmt.brightYellow("this")} = ${this}
+          `;
+          return;
+        }
+        properties[index] = { key, value: property };
+      };
+
+      if (typeof value === "object" && value && GetSpanSymbol in value) {
+        if (SpanGroupSymbol in value) {
+          const children: Spanned[] = value[SpanGroupSymbol];
+          if (!children.length) continue;
+
+          const start = findIndex(children[0]);
+          if (!start) continue;
+          for (const [index, child] of children.entries()) {
+            const itemIndex = start + index;
+            const item = items[itemIndex];
+            if (!child[GetSpanSymbol].equals(item.span)) {
+              console.error("span mismatch", child, item);
+            }
+            properties[itemIndex] = { key, value: child, groupIndex: index };
+          }
+        } else {
+          addProperty(key, value);
+        }
+      } else if (Array.isArray(value) && value.findIndex((el) => GetSpanSymbol in el) !== -1) {
+        throw new Error("use CstArray instead of normal array to contain CstNode or Token.");
+        // return value.map((el) => GetSpanSymbol in el ? fn(el) : el);
+      } else {
+        return value;
+      }
+    }
+
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index];
+      const property = properties[index];
+
+      fn(item, property);
+    }
   }
 
   mapEach(fn: <T extends CstTreeItem>(item: T) => T): this {
@@ -71,16 +143,19 @@ export class CstNode implements Spanned {
     };
 
     const newNode = {} as any;
-    for (const key of Reflect.ownKeys(this)) {
-      if (key === "tree") continue;
-      newNode[key] = this.mapOwnProperty((this as any)[key], mapItem);
+    for (const [key, value] of this.getOwnProperties()) {
+      newNode[key] = this.mapOwnProperty(key, value, mapItem);
     }
     newNode.tree = this.tree;
     Object.setPrototypeOf(newNode, Object.getPrototypeOf(this));
     return newNode;
   }
 
-  protected mapOwnProperty(value: any, fn: <T extends Spanned>(span: T) => T): any {
+  protected mapOwnProperty(
+    _key: PropertyKey,
+    value: any,
+    fn: <T extends Spanned>(span: T) => T,
+  ): any {
     if (typeof value === "object" && value && GetSpanSymbol in value) {
       if (SpanGroupSymbol in value) {
         return value[SpanGroupSymbol].map(fn);
@@ -92,6 +167,12 @@ export class CstNode implements Spanned {
     } else {
       return value;
     }
+  }
+
+  protected getOwnProperties(): readonly [PropertyKey, any][] {
+    return Reflect.ownKeys(this)
+      .filter((key) => key !== "tree")
+      .map((key) => [key, (this as any)[key]]);
   }
 
   /// Formatting
