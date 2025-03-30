@@ -32,72 +32,75 @@ export const FormatClassName = Symbol("FormatClassName"); // value: get () => st
 export const Indent = "  ";
 
 /// Format decorators
-function formatSymbolDecorator(
-  symbol: symbol,
-  isValue: boolean,
-  map: (value: any) => any = (value) => value,
-): (
-  value: any,
-  context: ClassMethodDecoratorContext | ClassGetterDecoratorContext | ClassFieldDecoratorContext,
-) => void {
-  return (_value, context) => {
-    if (isValue && context.kind === "method") {
-      return context.addInitializer(function () {
-        Object.defineProperty(this, symbol, {
-          get: () => map(context.access.get(this).call(this)),
-          enumerable: false,
-          configurable: true,
-        });
-      });
-    }
-    context.addInitializer(function () {
-      Object.defineProperty(this, symbol, {
-        get: () => map(context.access.get(this)),
-        enumerable: false,
-        configurable: true,
-      });
-    });
-  };
-}
 
 export namespace format {
-  export const className = formatSymbolDecorator(FormatClassName, true);
-  export const objectEntries = formatSymbolDecorator(FormatObjectEntries, true);
-
-  export function print(_value: () => string | Entry, context: ClassMethodDecoratorContext): void {
-    context.addInitializer(function () {
-      Object.defineProperty(this, ToFormatString, {
-        get: () => context.access.get(this),
-        enumerable: false,
-        configurable: true,
+  function decorateOnInitialize<Value, Context extends DecoratorContext>(
+    onInitialize: (context: Context, self: unknown) => void,
+  ): (value: Value, context: Context) => void {
+    return (_value, context) => {
+      context.addInitializer(function () {
+        onInitialize(context, this);
       });
+    };
+  }
+
+  function defineProperty<T>(self: T, key: PropertyKey, getter: (self: T) => any) {
+    Object.defineProperty(self, key, {
+      get() {
+        return getter(this);
+      },
+      enumerable: false,
+      configurable: true,
     });
   }
 
-  export function representation(
-    _value: () => string | Entry,
-    context: ClassMethodDecoratorContext,
-  ): void {
-    context.addInitializer(function () {
-      Object.defineProperty(this, ToFormatString, {
-        get: () => context.access.get(this),
-        enumerable: false,
-        configurable: true,
-      });
-      if ("Deno" in globalThis) {
-        Object.defineProperty(this, Symbol.for("Deno.customInspect"), {
-          get: () => (_inspect: typeof Deno.inspect, inspectOptions: Deno.InspectOptions) => {
+  export const className = decorateOnInitialize<
+    () => string | Entry,
+    ClassMethodDecoratorContext
+  >((context, self) => defineProperty(self, FormatClassName, context.access.get));
+
+  export const objectEntries = decorateOnInitialize<
+    () => string | Entry,
+    ClassMethodDecoratorContext
+  >((context, self) => defineProperty(self, FormatObjectEntries, context.access.get));
+
+  export const print = decorateOnInitialize<
+    () => string | Entry,
+    ClassMethodDecoratorContext
+  >((context, self) => defineProperty(self, ToFormatString, context.access.get));
+
+  export const representation = decorateOnInitialize<
+    () => string | Entry,
+    ClassMethodDecoratorContext
+  >((context, self) => {
+    defineProperty(self, ToFormatString, context.access.get);
+    if ("Deno" in globalThis) {
+      defineProperty(
+        self,
+        Symbol.for("Deno.customInspect"),
+        () =>
+          function (this: any, _inspect: typeof Deno.inspect, inspectOptions: Deno.InspectOptions) {
             return formatRaw(
               { oneLine: inspectOptions.compact ?? true, style: inspectOptions.colors ?? true },
               () => mapInput(context.access.get(this)),
             );
           },
-          enumerable: false,
-          configurable: true,
+      );
+    }
+  });
+
+  export const asEnum = decorateOnInitialize<
+    any,
+    ClassDecoratorContext | ClassFieldDecoratorContext
+  >((context, self) => {
+    if (context.kind === "class") {
+      defineProperty(self, ToFormatString, () =>
+        function (this: any) {
+          return fmt.magenta(this.constructor.name);
         });
-      }
-    });
-  }
+    } else {
+    }
+  });
 }
 
 export const ObjectStack: object[] = [];
@@ -437,27 +440,6 @@ class StyleEntry extends Entry {
   }
 }
 
-export const FormatEntries = {
-  value: ValueEntry,
-  group: GroupEntry,
-  context: ContextEntry,
-  list: ListEntry,
-  object: ObjectEntry,
-  trailing: TrailingEntry,
-  style: StyleEntry,
-
-  join(entries: Entry[], separator: Entry = new ValueEntry(", ")) {
-    const list = new ListEntry();
-    let first = true;
-    for (const entry of entries) {
-      if (!first) list.push(separator);
-      list.push(entry);
-      first = false;
-    }
-    return list;
-  },
-};
-
 export type FormatEntry = Entry;
 
 interface FormatFn<F extends (value: string, ...args: any) => string> {
@@ -510,6 +492,29 @@ const CommonStyled = {
   "[": new ValueEntry("["),
   "]": new ValueEntry("]"),
   '"': new ValueEntry('"'),
+};
+
+export const FormatEntries = {
+  value: ValueEntry,
+  group: GroupEntry,
+  context: ContextEntry,
+  list: ListEntry,
+  object: ObjectEntry,
+  trailing: TrailingEntry,
+  style: StyleEntry,
+
+  common: CommonStyled,
+
+  join(entries: Entry[], separator: Entry = new ValueEntry(", ")) {
+    const list = new ListEntry();
+    let first = true;
+    for (const entry of entries) {
+      if (!first) list.push(separator);
+      list.push(entry);
+      first = false;
+    }
+    return list;
+  },
 };
 
 export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
@@ -600,7 +605,8 @@ function fmtTemplate(strings: TemplateStringsArray, ...args: any[]): Entry {
   const list = new ListEntry();
   for (let i = 0; i < strings.length; i++) {
     if (i !== 0) list.push(valueToColorStringEntry(args[i - 1]));
-    list.push(new ValueEntry(strings[i]));
+    const str = strings[i];
+    if (str.length) list.push(new ValueEntry(str));
   }
   return list;
 }
@@ -783,7 +789,10 @@ export function objectLiteralToStringEntry(
       item.push(rawStyle(dim, between));
       item.push(valueToColorStringEntry(value));
       item.push(new TrailingEntry(CommonStyled[","]));
-      result.push(mapItem ? mapItem(`${key}`, value, item) : item, [true, true]);
+      result.push(
+        mapItem ? mapItem(typeof key === "string" ? key : key.toString(), value, item) : item,
+        [true, true],
+      );
     }
   } finally {
     ObjectStack.pop();
@@ -809,16 +818,32 @@ export function formatEntries(data: object): ReadonlyArray<readonly [any, any]> 
 
 export function arrayToStringEntry(
   data: any[],
+  mapItem?: (key: string | number, value: any, item: ListEntry) => Entry,
 ): Entry {
   const result = new ObjectEntry(data);
   ObjectStack.push(data);
 
   try {
-    for (const value of Object.values(data)) {
+    for (let index = 0; index < data.length; index++) {
+      const value = data[index];
       const item = new ListEntry();
-      item.push(valueToColorStringEntry(value), [true, false]);
-      item.push(new TrailingEntry(CommonStyled[","]), [false, true]);
-      result.push(item);
+      item.push(valueToColorStringEntry(value));
+      item.push(new TrailingEntry(CommonStyled[","]));
+      result.push(mapItem ? mapItem(index, value, item) : item, [true, true]);
+    }
+    for (const key of Reflect.ownKeys(data).slice(data.length)) {
+      if (key === "length") continue;
+
+      const value = (data as any)[key];
+      const item = new ListEntry();
+      item.push(mapInput(key));
+      item.push(rawStyle(dim, ": "));
+      item.push(valueToColorStringEntry(value));
+      item.push(new TrailingEntry(CommonStyled[","]));
+      result.push(
+        mapItem ? mapItem(typeof key === "string" ? key : key.toString(), value, item) : item,
+        [true, true],
+      );
     }
   } finally {
     ObjectStack.pop();

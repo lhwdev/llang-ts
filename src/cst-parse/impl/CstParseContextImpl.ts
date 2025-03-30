@@ -44,6 +44,10 @@ export class CstParseContextImpl<Node extends CstNode> extends CstGroupParseCont
     this.provideContext(ContextKeys.ImplicitNode.provides(implicitNode));
   }
 
+  withRootSelf<R>(fn: () => R): R {
+    return withContext(this, fn);
+  }
+
   /// Children management
 
   override withCurrent<R>(current: CstIntermediateGroup, fn: () => R): R {
