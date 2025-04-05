@@ -5,15 +5,13 @@ import { CstExpression } from "./CstExpression.ts";
 
 export abstract class CstLiteral extends CstExpression {
   declare private $literal: void;
-}
 
-export abstract class CstConstLiteral extends CstLiteral {
-  declare private $constLiteral: void;
+  abstract readonly isConst: boolean;
 }
 
 /// Const literals
 
-export class CstNumberLiteral extends CstConstLiteral {
+export class CstNumberLiteral extends CstLiteral {
   declare private $numberLiteral: void;
   readonly value: number;
 
@@ -24,9 +22,13 @@ export class CstNumberLiteral extends CstConstLiteral {
 
     this.value = parseInt(token.code.replaceAll("_", ""));
   }
+
+  override get isConst(): boolean {
+    return true;
+  }
 }
 
-export class CstBooleanLiteral extends CstConstLiteral {
+export class CstBooleanLiteral extends CstLiteral {
   declare private $booleanLiteral: void;
   readonly value: boolean;
 
@@ -36,17 +38,38 @@ export class CstBooleanLiteral extends CstConstLiteral {
     super();
     this.value = token.is(Tokens.Literal.Boolean.True) ? true : false;
   }
+
+  override get isConst(): boolean {
+    return true;
+  }
 }
 
-export class CstStringLiteral extends CstConstLiteral {
+export class CstStringLiteral extends CstLiteral {
   declare private $stringLiteral: void;
-  readonly value: string;
 
   constructor(
-    readonly items: CstList<CstStringTemplateText>,
+    readonly left: Token<Tokens.Literal.String.Left>,
+    readonly items: CstList<CstStringLiteralItem>,
+    readonly right: Token<Tokens.Literal.String.Right>,
+    readonly value: string | null,
   ) {
     super();
-    this.value = items.map((item) => {
+  }
+
+  get isConst(): boolean {
+    return this.value !== null;
+  }
+
+  static from(
+    left: Token<Tokens.Literal.String.Left>,
+    items: CstList<CstStringLiteralItem>,
+    right: Token<Tokens.Literal.String.Right>,
+  ) {
+    if (!items.every((item) => item instanceof CstStringLiteralText)) {
+      return new CstStringLiteral(left, items, right, null);
+    }
+
+    const value = items.map((item) => {
       const token = item.token;
       if (token.is(Tokens.Literal.String.Escape)) {
         const mapping = {
@@ -74,26 +97,15 @@ export class CstStringLiteral extends CstConstLiteral {
         return token.code;
       }
     }).join("");
+    return new CstStringLiteral(left, items, right, value);
   }
 }
 
-/// String template literal
-
-export class CstStringTemplate extends CstLiteral {
-  declare private $stringTemplate: void;
-
-  constructor(
-    readonly items: CstList<CstStringTemplateItem>,
-  ) {
-    super();
-  }
-}
-
-export abstract class CstStringTemplateItem extends CstExpression {
+export abstract class CstStringLiteralItem extends CstExpression {
   declare private $stringTemplateItem: void;
 }
 
-export class CstStringTemplateText extends CstStringTemplateItem {
+export class CstStringLiteralText extends CstStringLiteralItem {
   declare private $stringTemplateText: void;
   constructor(
     readonly token: Token<Tokens.Literal.String.Text>,
@@ -102,7 +114,7 @@ export class CstStringTemplateText extends CstStringTemplateItem {
   }
 }
 
-export class CstStringTemplateVariable extends CstStringTemplateItem {
+export class CstStringTemplateVariable extends CstStringLiteralItem {
   declare private $stringTemplateVariable: void;
 
   constructor(
@@ -112,7 +124,7 @@ export class CstStringTemplateVariable extends CstStringTemplateItem {
   }
 }
 
-export class CstStringTemplateExpression extends CstStringTemplateItem {
+export class CstStringTemplateExpression extends CstStringLiteralItem {
   declare private $stringTemplateExpression: void;
 
   constructor(

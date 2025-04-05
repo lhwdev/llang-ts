@@ -6,12 +6,11 @@ import {
   CstBooleanLiteral,
   CstNumberLiteral,
   CstStringLiteral,
-  CstStringTemplateItem,
+  CstStringLiteralItem,
 } from "../../cst/expression/CstLiteral.ts";
 import {
   CstLiteral,
-  CstStringTemplate,
-  CstStringTemplateText,
+  CstStringLiteralText,
   CstStringTemplateVariable,
 } from "../../cst/expression/CstLiteral.ts";
 import { Tokens } from "../../token/Tokens.ts";
@@ -20,7 +19,7 @@ export const cstLiteral = parser(CstLiteral, () => {
   let node;
   if (node = cstNumberLiteralOrNull()) return node;
   if (node = cstBooleanLiteralOrNull()) return node;
-  if (node = cstStringTemplateOrNull()) return node;
+  if (node = cstStringLiteralOrNull()) return node;
 
   throw new Error("no match " + code((c) => (c as any).debugNext));
 });
@@ -39,7 +38,7 @@ export const cstBooleanLiteralOrNull = nullableParser(CstBooleanLiteral, () => {
   return new CstBooleanLiteral(token);
 });
 
-export const cstStringTemplateOrNull = nullableParser(CstStringTemplate, () => {
+export const cstStringLiteralOrNull = nullableParser(CstStringLiteral, () => {
   const left = code((c) => c.next(Tokens.Literal.String.Left));
   if (!left) return null;
 
@@ -47,19 +46,19 @@ export const cstStringTemplateOrNull = nullableParser(CstStringTemplate, () => {
 
   const kind = left.kind.kind;
   const scope = codeScopes.stringLiteral(kind);
-  const items = CstMutableList<CstStringTemplateItem>();
+  const items = CstMutableList<CstStringLiteralItem>();
   while (true) {
     const next = code(scope, (c) => c.peek());
     if (next.is(Tokens.Literal.String.Text)) {
-      const text = node(CstStringTemplateText, () => {
+      const text = node(CstStringLiteralText, () => {
         const token = code(scope, (c) => c.consume(next));
-        return new CstStringTemplateText(token);
+        return new CstStringLiteralText(token);
       });
       items.push(text);
       continue;
     }
     if (next.is(Tokens.Literal.String.Template.ExprBegin)) {
-      const item = node(CstStringTemplateItem, () => {
+      const item = node(CstStringLiteralItem, () => {
         code(scope, (c) => c.consume(next));
         const expr = 0 as any; // TODO: some method to mark delimited?
         code(scope, (c) => c.expect(Tokens.Literal.String.Template.ExprEnd));
@@ -79,11 +78,7 @@ export const cstStringTemplateOrNull = nullableParser(CstStringTemplate, () => {
     }
     if (next.is(kind.right)) {
       code(scope, (c) => c.consume(next));
-      if (items.every((item) => item instanceof CstStringTemplateText)) {
-        return new CstStringLiteral(items);
-      } else {
-        return new CstStringTemplate(items);
-      }
+      return CstStringLiteral.from(left, items, next);
     }
     throw new Error(`unexpected token ${next}`);
   }
