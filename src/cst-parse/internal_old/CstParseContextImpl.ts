@@ -4,7 +4,7 @@ import type { CstTokenizerContext } from "../tokenizer/CstTokenizerContext.ts";
 import { CodeScopesImpl } from "../tokenizer/scopes.ts";
 import { CstCodeContextImpl } from "./CstCodeContextImpl.ts";
 import { insertChild } from "./CstInsertionContext.ts";
-import type { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
+import type { CstIntermediateGroup } from "../intermediate/CstIntermediateGroup.ts";
 import { CstParseContextBase } from "./CstParseContextBase.ts";
 import { CstRootGroup } from "./CstRootGroup.ts";
 

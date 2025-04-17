@@ -12,7 +12,7 @@ export function node<Node extends CstNode>(
 ): Node {
   const context = getContext();
   const child = context.beginChild(info);
-  const skip = child.skipping();
+  const skip = child.skipCurrent();
   if (skip) return skip;
   try {
     const node = context === child ? fn() : withContext(child, fn);
@@ -31,7 +31,7 @@ export function nullableNode<Node extends CstNode>(
 ): Node | null {
   const context = getContext();
   const child = context.beginChild(info);
-  const skip = child.skipping();
+  const skip = child.skipCurrent();
   if (skip) return skip;
   child.hintType("nullable");
   try {
@@ -55,7 +55,7 @@ export function discardableNode<Node extends CstNode>(
 ): Node | null {
   const context = getContext();
   const child = context.beginChild(info);
-  const skip = child.skipping();
+  const skip = child.skipCurrent();
   if (skip) return skip;
   child.hintType("discardable");
   try {

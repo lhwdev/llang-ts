@@ -8,11 +8,11 @@ import { Token } from "../token/Token.ts";
 import { detailedError } from "../common/error.ts";
 
 export class CstNode implements Spanned {
+  declare private $cstNode: void;
+
   tree: CstTree<this> = getContext().beforeEnd(this) as CstTree<this>;
 
   constructor() {}
-
-  declare private $cstNode: void;
 
   get [GetSpanSymbol](): Span {
     return this.tree[GetSpanSymbol];

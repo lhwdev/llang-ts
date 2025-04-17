@@ -9,7 +9,7 @@ import {
 import type { CstTokenizerContext } from "../tokenizer/CstTokenizerContext.ts";
 import type { CstCodeScope, CstCodeScopes } from "../tokenizer/CstCodeScope.ts";
 import type { CstCodeContextImpl } from "./CstCodeContextImpl.ts";
-import type { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
+import type { CstIntermediateGroup } from "../intermediate/CstIntermediateGroup.ts";
 import { fmt, format, type FormatEntry } from "../../utils/format.ts";
 import type { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";

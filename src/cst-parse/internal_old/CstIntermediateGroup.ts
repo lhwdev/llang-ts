@@ -7,7 +7,7 @@ import type { Token } from "../../token/Token.ts";
 import { fmt } from "../../utils/format.ts";
 import { detailedParseError } from "../impl/errors.ts";
 import type { CstCodeScope } from "../tokenizer/CstCodeScope.ts";
-import { CstGroup } from "./CstGroup.ts";
+import { CstGroup } from "../internal_old/CstGroup.ts";
 
 export class CstIntermediateGroup {
   constructor(

@@ -1,4 +1,10 @@
 import { CstNode } from "../cst/CstNode.ts";
+import type { CstNodeInfo } from "../cst/CstNodeInfo.ts";
+import { CstParseIntrinsicKey } from "./CstParseIntrinsics.ts";
+
+export interface CstSpecialNodeInfo<Node extends CstNode> extends CstNodeInfo<Node> {
+  intrinsic?: CstParseIntrinsicKey<any>;
+}
 
 export class CstSpecialNode extends CstNode {
   declare private $special: void;
@@ -34,6 +40,10 @@ export class CstInsertedNode<Node extends CstNode> extends CstSpecialNode {
   constructor(readonly value: Node) {
     super();
   }
+
+  static intrinsic = new CstParseIntrinsicKey.Global<
+    { insertNode<Child extends CstNode>(node: Child): Child }
+  >("InsertedNode");
 }
 
 export class CstConstraintNodeRoot<Value> extends CstSpecialNode {

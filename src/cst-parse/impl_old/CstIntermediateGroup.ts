@@ -7,9 +7,8 @@ import type { Token } from "../../token/Token.ts";
 import { isInherited } from "../../utils/extends.ts";
 import { fmt, formatClass, FormatEntries, type FormatEntry } from "../../utils/format.ts";
 import type { CstCodeContext } from "../CstCodeContext.ts";
-import type { ContextValue, CstNodeHintType, CstParseContext } from "../CstParseContext.ts";
-import { ContextKey, NodeHint, withContext } from "../CstParseContext.ts";
-import { ContextKeys, getContext, NodeHints } from "../CstParseContext.ts";
+import type { CstNodeHintType, CstParseContext } from "../CstParseContext.ts";
+import { getContext, NodeHint, NodeHints, withContext } from "../CstParseContext.ts";
 import { debug, DebugFlags } from "./debug.ts";
 import type { CstCodeScope, CstCodeScopes } from "../tokenizer/CstCodeScope.ts";
 import { type CstCodeContextImpl, subscribeToken } from "./CstCodeContextImpl.ts";
@@ -23,7 +22,7 @@ import {
   CstGroupParseContext,
   type CstParseContextParent,
 } from "./CstGroupParseContext.ts";
-import type { CstParseIntrinsics } from "../CstParseIntrinsics.ts";
+import type { CstParseIntrinsicKey, CstParseIntrinsics } from "../CstParseIntrinsics.ts";
 import { getCallStackFrames, StackFrame } from "../../utils/errorStackParser.ts";
 import { stripAnsiCode } from "../../utils/ansi.ts";
 import type { CstMutableList, CstMutableListInternal } from "../CstMutableList.ts";
@@ -325,6 +324,10 @@ export abstract class CstIntermediateGroup implements CstParseIntrinsics {
       }
       return child.end(new CstPeekNode(node()));
     }).value;
+  }
+
+  intrinsic<T>(key: CstParseIntrinsicKey<T>): T {
+    throw new Error(`unexpected intrinsic ${key}`);
   }
 
   /// Code parsing

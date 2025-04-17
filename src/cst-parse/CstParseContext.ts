@@ -4,8 +4,9 @@ import type { CstNode } from "../cst/CstNode.ts";
 import type { CstNodeInfo } from "../cst/CstNodeInfo.ts";
 import type { CstTree } from "../cst/CstTree.ts";
 import type { CstCodeScope, CstCodeScopes } from "./tokenizer/CstCodeScope.ts";
-import type { CstParser } from "./parser.ts";
 import type { CstParseIntrinsics } from "./CstParseIntrinsics.ts";
+import { CstIntermediateGroup } from "./intermediate/CstIntermediateGroup.ts";
+import type { CstContextLocal, CstContextLocalKey } from "./CstContextLocal.ts";
 
 let baseContext: CstParseContext | null = null;
 
@@ -36,15 +37,15 @@ export interface CstParseContext<out Node extends CstNode = CstNode> {
 
   /// Node management
   beginChild<Child extends CstNode>(info: CstNodeInfo<Child>): CstParseContext<Child>;
-  skipping(): Node | null;
+  skipCurrent(): Node | null;
 
   readonly intrinsics: CstParseIntrinsics;
   hintType(type: CstNodeHintType): void;
 
   memoize<T>(calculate: () => T, dependencies?: unknown[]): T;
 
-  provideContext(value: ContextValue<any>): void;
-  resolveContext<T>(key: ContextKey<T>): ContextValue<T>;
+  provideContext(value: CstContextLocal<any>): void;
+  resolveContext<T>(key: CstContextLocalKey<T>): CstContextLocal<T>;
 
   beforeEnd(node: Node): CstTree<Node>;
 
@@ -53,7 +54,26 @@ export interface CstParseContext<out Node extends CstNode = CstNode> {
   endWithError(error: unknown | null): Node | null;
 
   insertChild<Child extends CstNode>(node: Child): Child;
+
+  /// Group
+  currentGroup: CstIntermediateGroup<Node>;
+
+  withCurrentGroup<R, Group extends CstIntermediateGroup<any>>(
+    group: Group,
+  ): (fn: (group: Group) => R) => R;
 }
+
+Object.defineProperty(CstIntermediateGroup, "current", { get: () => getContext().currentGroup });
+
+Object.defineProperty(CstIntermediateGroup.prototype, "withSelf", {
+  get() {
+    return getContext().withCurrentGroup(this);
+  },
+});
+
+// CstIntermediateGroup.prototype.withSelf = function (fn) {
+//   return getContext().withCurrentGroup(this, fn);
+// };
 
 export abstract class NodeHint<Value> {
   declare private $: void;
@@ -73,34 +93,4 @@ export namespace NodeHints {
   export class DebugImportance extends NodeHint<"hide"> {
     declare private debugNodeName: void;
   }
-}
-
-export class ContextKey<T> {
-  declare private $ContextKey: void;
-
-  constructor(readonly name?: string) {}
-
-  provides(value: T): ContextValue<T> {
-    return new ContextValue(this, value);
-  }
-}
-
-export class ContextValue<T> {
-  declare private $ContextValue: void;
-
-  constructor(
-    readonly key: ContextKey<T>,
-    readonly value: T,
-  ) {}
-}
-
-export namespace ContextKeys {
-  export const ImplicitNode = new ContextKey<
-    CstParser<CstNode, (() => CstNode | null)> | null
-  >("ImplicitNode");
-
-  export const IsImplicit = new ContextKey<boolean>("IsImplicit");
-
-  export const CodeScopes = new ContextKey<CstCodeScopes>("CodeScopes");
-  export const CodeScope = new ContextKey<CstCodeScope>("CodeScope");
 }

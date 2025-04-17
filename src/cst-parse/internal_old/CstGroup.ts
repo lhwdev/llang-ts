@@ -4,7 +4,7 @@ import { CstTree, type CstTreeItem } from "../../cst/CstTree.ts";
 import { Span } from "../../token/Span.ts";
 import type { Spanned } from "../../token/Spanned.ts";
 import type { Token } from "../../token/Token.ts";
-import type { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
+import type { CstIntermediateGroup } from "../intermediate/CstIntermediateGroup.ts";
 
 // Some note: why I used `declare property ...` instead of normal?
 // To align behavior with recent ecmascript class, all properties of TS class

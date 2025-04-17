@@ -1,8 +1,9 @@
-import { constraintNode } from "../cst-parse/CstConstraintNode.ts";
+import { constraintNode } from "../cst-parse/constraint/constraintNode.ts";
+import { nullableNode } from "../cst-parse/inlineNode.ts";
 import { cstImplicitList } from "../cst-parser/cstImplicit.ts";
 import {
   cstNumberLiteralOrNull,
-  cstStringTemplateOrNull,
+  cstStringLiteralOrNull,
 } from "../cst-parser/expression/cstLiteral.ts";
 import type { CstList } from "../cst/CstList.ts";
 import { CstNode } from "../cst/CstNode.ts";
@@ -22,8 +23,19 @@ testCstParse(testCode, () => {
   cstImplicitList();
   constraintNode(CoolNode, (scope) => {
     const list = scope.repeat().atLeast(1).invokeMinimum(() => cstNumberLiteralOrNull());
-    const other = scope.node(() => cstStringTemplateOrNull()).map((v) => v);
+    const other = scope.node(() => cstStringLiteralOrNull()).map((v) => v);
 
     return new CoolNode(list.value, other.value);
+  });
+
+  if (parseInt("1")) return;
+
+  constraintNode((scope) => {
+    nullableNode(CoolNode, () => {
+      const list = scope.repeat().atLeast(1).invokeMinimum(() => cstNumberLiteralOrNull());
+      const other = scope.node(() => cstStringLiteralOrNull()).map((v) => v);
+
+      return new CoolNode(list.value, other.value);
+    });
   });
 });

@@ -10,7 +10,7 @@ import type { CstTokenizerContext } from "../tokenizer/CstTokenizerContext.ts";
 import { CstCodeContextImpl } from "./CstCodeContextImpl.ts";
 import { CstGroup } from "./CstGroup.ts";
 import { CstInsertingIntermediateGroup } from "./CstInsertingIntermediateGroup.ts";
-import { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
+import { CstIntermediateGroup } from "../intermediate/CstIntermediateGroup.ts";
 import { CstParseContextBase } from "./CstParseContextBase.ts";
 import { debug } from "../impl/debug.ts";
 

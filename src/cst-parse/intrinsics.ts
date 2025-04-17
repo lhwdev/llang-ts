@@ -19,6 +19,11 @@ export function memoize<T>(calculate: () => T, dependencies?: unknown[]): T {
   return getContext().memoize(calculate, dependencies);
 }
 
+// export namespace memoize {
+//   export const OnRemembered = Symbol("OnRemembered");
+//   export const OnForgotten = Symbol("OnForgotten");
+// }
+
 export function code<R>(fn: (code: CstCodeContext) => R): R;
 export function code<R>(scope: CstCodeScope | null, fn: (code: CstCodeContext) => R): R;
 

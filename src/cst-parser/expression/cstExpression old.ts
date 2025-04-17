@@ -1,4 +1,3 @@
-import type { CstConstraintScope } from "../../cst-parse/constraint/CstConstraintScope.ts";
 import { peek, peekNode } from "../../cst-parse/inlineNode.ts";
 import { code, endOfCode } from "../../cst-parse/intrinsics.ts";
 import { unexpectedTokenError } from "../../cst-parse/parseError.ts";
@@ -48,24 +47,8 @@ import { cstReference } from "./cstReference.ts";
  * All starred items are treated specially.
  *
  * Eager operations:
- * - group
+ * - group, access
  */
-
-const cstExpression = parser(CstExpression, (scope: CstConstraintScope) => {
-  const stack = new ExpressionStack();
-
-  scope.repeat(() => );
-});
-
-type Item = CstExpression | CstOperator;
-
-class ExpressionStack {
-  private data: Item[] = [];
-
-  push(item: Item) {
-    this.data.push(item);
-  }
-}
 
 /**
  * Can parse:
@@ -81,8 +64,7 @@ const cstPrefix = nullableParser(CstOperator, () => {
 /**
  * Can parse atom expression.
  * - {@link CstGroup}; ()
- * - constant literal, string template literal
- * - lambda expression
+ * - literal
  * - reference; <identifier>
  */
 const cstAtom = parser(CstExpression, () => {
@@ -106,6 +88,16 @@ const cstAtom = parser(CstExpression, () => {
   unexpectedTokenError(token);
 }, { name: "atom" });
 
+class CstCallDelimiter extends CstOperator {
+  constructor(readonly kind: Tokens.Delimiter.Left) {
+    super();
+  }
+
+  override get precedence(): OperatorPrecedence {
+    return OperatorPrecedence.Invoke;
+  }
+}
+
 /**
  * Can parse:
  * - unary ops (postfix)
@@ -119,16 +111,6 @@ const cstPostfix = nullableParser(CstOperator, () => {
   return null;
 }, { name: "postfix" });
 
-class CstCallDelimiter extends CstOperator {
-  constructor(readonly kind: Tokens.Delimiter.Left) {
-    super();
-  }
-
-  override get precedence(): OperatorPrecedence {
-    return OperatorPrecedence.Invoke;
-  }
-}
-
 /**
  * Can parse:
  * - binary ops; + - * / etc, infix, dot
@@ -139,3 +121,94 @@ const cstBinary = parser(CstOperator, () => {
 
   throw new Error("???");
 }, { name: "binary" });
+
+/** */
+export const cstExpression = parser(CstExpression, () => {
+  const list = peek(() => {
+    const list: (CstExpression | CstOperator)[] = [];
+    while (!endOfCode()) {
+      let node;
+      if (node = cstPrefix()) list.push(node);
+      if (node = cstAtom()) list.push(node);
+      if (node = cstPostfix()) list.push(node);
+      if (endOfCode()) {
+        break;
+      } else {
+        list.push(cstBinary());
+      }
+    }
+    return list;
+  });
+});
+
+function cstExpressionInner() {
+  const stack: CstExpression[] = [];
+  const operators: CstOperator[] = [];
+
+  const makeOperation = (operator: CstOperator) =>
+    peekNode(CstOperation, () => {
+      if (operator instanceof CstBinaryOperator) {
+        const right = stack.pop();
+        const left = stack.pop();
+        if (!right || !left) {
+          throw new Error(fmt`null operand for ${operator}: left=${left} right=${right}`.s);
+        }
+        return new CstBinaryOperation(left, operator, right);
+      } else if (operator instanceof CstUnaryOperator) {
+        const operand = stack.pop()!;
+        return new CstUnaryOperation(operator, operand);
+      } else {
+        console.error("unknown operator", operator);
+        throw new Error("unknown operator");
+      }
+    });
+
+  const handleOperator = (operator: CstOperator) => {
+    operators.push(operator);
+    while (true) {
+      const before = operators.at(-2);
+      if (!before) break;
+      const last = operators.at(-1)!;
+      if (before.precedence >= last.precedence) {
+        stack.push(makeOperation(operator));
+      }
+    }
+  };
+
+  while (!endOfCode()) {
+    let node;
+    if (node = cstPrefix()) handleOperator(node);
+    if (node = cstAtom()) stack.push(node);
+    if (node = cstPostfix()) {
+      handleOperator(node);
+      if (node instanceof CstCallDelimiter) {
+        console.assert(node === operators.pop());
+        const fn = stack.pop()!;
+
+        let call;
+        switch (node.kind) {
+          case Tokens.Delimiter.Left.Brace:
+            call = cstLambdaCall(fn);
+            break;
+          case Tokens.Delimiter.Left.Bracket:
+            call = cstGetCall(fn);
+            break;
+          case Tokens.Delimiter.Left.Paren:
+            call = cstSimpleCall(fn);
+            break;
+          case Tokens.Delimiter.Left.AngleBracket:
+            call = cstCall(fn);
+            break;
+          default:
+            unexpectedTokenError(code((c) => c.peek()));
+        }
+        stack.push(call);
+      }
+    }
+    if (endOfCode()) {
+      break;
+    } else {
+      handleOperator(cstBinary());
+    }
+  }
+}

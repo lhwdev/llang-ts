@@ -83,7 +83,7 @@ export abstract class CstGroupParseContext<Node extends CstNode>
 
   abstract beginChild<Child extends CstNode>(info: CstNodeInfo<Child>): CstParseContext<Child>;
 
-  skipping(): Node | null {
+  skipCurrent(): Node | null {
     return this.current.skipping();
   }
 

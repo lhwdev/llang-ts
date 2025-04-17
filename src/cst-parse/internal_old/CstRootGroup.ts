@@ -1,7 +1,7 @@
 import type { CstNode } from "../../cst/CstNode.ts";
 import { CstRootNode } from "../../cst/CstRootNode.ts";
 import type { CstGroup } from "./CstGroup.ts";
-import { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
+import { CstIntermediateGroup } from "../intermediate/CstIntermediateGroup.ts";
 
 export class CstRootGroup extends CstIntermediateGroup {
   constructor() {

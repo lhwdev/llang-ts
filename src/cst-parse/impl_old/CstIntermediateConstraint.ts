@@ -1,21 +1,7 @@
 import { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
-import { LazyValue } from "../../utils/Value.ts";
 import { isInherited } from "../../utils/extends.ts";
 import type { CstCodeContext } from "../CstCodeContext.ts";
-import type {
-  CstConstraintNodeInfo,
-  CstMaybeNodeInfo,
-  CstNoConstraintNodeInfo,
-  CstRepeatNodeInfo,
-} from "../CstConstraintNode.ts";
-import {
-  ConstraintNodeItemMarker,
-  CstConstraintNode,
-  CstMaybeNode,
-  CstNoConstraintNode,
-  CstRepeatNode,
-} from "../CstConstraintNode.ts";
 import type { CstCodeScope } from "../tokenizer/CstCodeScope.ts";
 import type { CstGroup } from "./CstGroup.ts";
 import type { CstIntermediateGroup } from "./CstIntermediateGroup.ts";
@@ -27,10 +13,22 @@ import { fmt } from "../../utils/format.ts";
 import { type CstNodeHintType, NodeHint, NodeHints } from "../CstParseContext.ts";
 import { CstConstraintNodeRoot } from "../CstSpecialNode.ts";
 import { intrinsics } from "../intrinsics.ts";
+import { ConstraintNodeItemMarker } from "../constraint/intrinsics.ts";
+import { CstConstraintNode, type CstConstraintNodeInfo } from "../constraint/CstConstraintNode.ts";
+import { CstNoConstraintNode, type CstNoConstraintNodeInfo } from "../constraint/noConstraint.ts";
+import { CstMaybeNode, type CstMaybeNodeInfo } from "../constraint/maybe.ts";
+import { CstRepeatNode, type CstRepeatNodeInfo } from "../constraint/repeat.ts";
+import { CstLazyNode } from "../constraint/CstLazyNode.ts";
+import { LazyValue } from "../../utils/Value.ts";
 
 export class CstIntermediateConstraintRoot extends CstIntermediateNode {
   protected override createChild(info: CstNodeInfo<any>): CstIntermediateGroup {
     return new (this.childInstance(CstIntermediateConstraints))(this, info);
+  }
+
+  override endChild(child: CstGroup, from: CstIntermediateGroup): void {
+    if (this.items.length >= 1) throw new Error("only one child is allowed");
+    super.endChild(child, from);
   }
 
   override beforeEnd<Node extends CstNode>(node: Node): CstGroup<Node> {
@@ -54,7 +52,7 @@ export class CstIntermediateConstraints extends CstIntermediateNode {
     if (value instanceof ConstraintNodeItemMarker) {
       if (this.constraintsResolved) {
         throw detailedParseError`
-          Constraints already resolved; do not use returned LazyValue from ConstraintNodeScope until end.
+          Constraints already resolved; do not use returned CstLazyNode from ConstraintNodeScope until end.
           
           Wrong example: ${
           fmt.code(
@@ -68,10 +66,10 @@ export class CstIntermediateConstraints extends CstIntermediateNode {
 
       const constraint = Constraint.create(value);
       this.constraints.push(constraint);
-      value.value = LazyValue.of(() => {
+      value.value = new CstLazyNode(LazyValue.of(() => {
         this.resolveConstraints();
         return value.resolvedValue!;
-      });
+      }));
       return value;
     }
 
@@ -120,6 +118,10 @@ export class CstIntermediateConstraints extends CstIntermediateNode {
     return child;
   }
 
+  protected override createChild(info: CstNodeInfo<any>): CstIntermediateGroup {
+    return new (this.childInstance(CstIntermediateIndirectConstraint))(this, info, this);
+  }
+
   override createSpecialChild(info: CstNodeInfo<any>): CstIntermediateGroup | null {
     const parent = super.createSpecialChild(info);
     if (parent) return parent;
@@ -137,13 +139,6 @@ export class CstIntermediateConstraints extends CstIntermediateNode {
     throw new Error("unknown constraint node");
   }
 
-  protected override createChild(info: CstNodeInfo<any>): CstIntermediateGroup {
-    throw detailedParseError`
-      Cannot insert node ${info} into ${fmt.code("constraintNode()")}.
-      Use ${fmt.code("scope.node()")} instead.
-    `;
-  }
-
   override beforeEnd<Node extends CstNode>(node: Node): CstGroup<Node> {
     this.resolveConstraints();
     return super.beforeEnd(node);
@@ -155,6 +150,26 @@ export class CstIntermediateConstraints extends CstIntermediateNode {
     if (from instanceof CstIntermediateConstraint && from.constraintChain) {
       this.constraintChainsMap.set(from.constraintChain, child);
     }
+  }
+}
+
+// TODO: these methods are very vulnerable; ex) inside peek(...), this will not work
+// need better way to implement this via composition pattern, not via simply inheriting
+class CstIntermediateIndirectConstraint extends CstIntermediateNode {
+  constructor(
+    parent: CstIntermediateGroup,
+    info: CstNodeInfo<any>,
+    readonly root: CstIntermediateConstraints,
+  ) {
+    super(parent, info);
+  }
+
+  protected override createChild(info: CstNodeInfo<any>): CstIntermediateGroup {
+    return new (this.childInstance(CstIntermediateIndirectConstraint))(this, info, this.root);
+  }
+
+  override createSpecialChild(info: CstNodeInfo<any>): CstIntermediateGroup | null {
+    return this.root.createSpecialChild(info);
   }
 }
 
@@ -474,7 +489,7 @@ class ConstraintChain extends ConstraintChainNext {
   onResolved(value: CstNode) {
     this.value = value;
     this.c.marker.resolvedValue = value;
-    this.c.marker.value = LazyValue.resolved(value);
+    this.c.marker.value = new CstLazyNode(LazyValue.resolved(value));
   }
 
   override asNext: ConstraintNext = Object.assign(() =>

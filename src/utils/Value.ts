@@ -1,12 +1,12 @@
 export interface Value<T> {
   readonly value: T;
 
-  map<U>(fn: (value: T) => U): U;
+  map<U>(fn: (value: T) => U): Value<U>;
 }
 
 const Empty = Symbol("Empty");
 
-export abstract class LazyValue<T> {
+export abstract class LazyValue<T> implements Value<T> {
   abstract readonly value: T;
 
   static of<T>(calculate: () => T): LazyValue<T> {
