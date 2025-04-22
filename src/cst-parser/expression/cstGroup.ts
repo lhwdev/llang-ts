@@ -1,5 +1,5 @@
-import { code } from "../../cst-parse/intrinsics.ts";
-import { parser } from "../../cst-parse/parser.ts";
+import { code } from "../../../lib/cst-code/intrinsics.ts";
+import { parser } from "../../../lib/cst-parse/parser.ts";
 import { CstGroup } from "../../cst/expression/CstGroup.ts";
 import { Tokens } from "../../token/Tokens.ts";
 

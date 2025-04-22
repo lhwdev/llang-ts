@@ -1,7 +1,7 @@
-import type { Token } from "../../token/Token.ts";
+import type { Token } from "../../../lib/token/Token.ts";
 import type { Tokens } from "../../token/Tokens.ts";
-import { CstNode } from "../CstNode.ts";
-import type { CstList } from "../CstList.ts";
+import { CstNode } from "../../../lib/cst/CstNode.ts";
+import type { CstList } from "../../../lib/cst/CstList.ts";
 import type { CstType } from "./CstType.ts";
 
 export class CstTypeArguments extends CstNode {

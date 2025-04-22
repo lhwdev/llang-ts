@@ -1,6 +1,7 @@
-import { code, enableDiscard } from "../../cst-parse/intrinsics.ts";
-import { unexpectedTokenError } from "../../cst-parse/parseError.ts";
-import { nullableParser, parser } from "../../cst-parse/parser.ts";
+import { enableDiscard } from "../../../lib/cst-parse/intrinsics.ts";
+import { code } from "../../../lib/cst-code/intrinsics.ts";
+import { unexpectedTokenError } from "../../../lib/cst-parse/parseError.ts";
+import { nullableParser, parser } from "../../../lib/cst-parse/parser.ts";
 import { CstBinaryOperator } from "../../cst/expression/CstOperator.ts";
 import { CstUnaryOperator } from "../../cst/expression/CstOperator.ts";
 import { Tokens } from "../../token/Tokens.ts";

@@ -1,7 +1,8 @@
-import { node } from "../../cst-parse/inlineNode.ts";
-import { code, codeScopes, intrinsics } from "../../cst-parse/intrinsics.ts";
-import { nullableParser, parser } from "../../cst-parse/parser.ts";
-import { CstMutableList } from "../../cst-parse/CstMutableList.ts";
+import { node } from "../../../lib/cst-parse/inlineNode.ts";
+import { intrinsics } from "../../../lib/cst-parse/intrinsics.ts";
+import { code } from "../../../lib/cst-code/intrinsics.ts";
+import { nullableParser, parser } from "../../../lib/cst-parse/parser.ts";
+import { CstMutableList } from "../../../lib/cst-parse/CstMutableList.ts";
 import {
   CstBooleanLiteral,
   CstNumberLiteral,
@@ -13,7 +14,8 @@ import {
   CstStringLiteralText,
   CstStringTemplateVariable,
 } from "../../cst/expression/CstLiteral.ts";
-import { Tokens } from "../../token/Tokens.ts";
+import { Tokens } from "../../../src/token/Tokens.ts";
+import { codeScopes } from "../../tokenizer/index.ts";
 
 export const cstLiteral = parser(CstLiteral, () => {
   let node;

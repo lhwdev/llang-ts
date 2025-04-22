@@ -1,5 +1,6 @@
 import { peek, peekNode } from "../../cst-parse/inlineNode.ts";
-import { code, endOfCode } from "../../cst-parse/intrinsics.ts";
+import { endOfCode } from "../../cst-parse/intrinsics.ts";
+import { code } from "../../cst-code/intrinsics.ts";
 import { unexpectedTokenError } from "../../cst-parse/parseError.ts";
 import { nullableParser, parser } from "../../cst-parse/parser.ts";
 import { CstExpression } from "../../cst/expression/CstExpression.ts";

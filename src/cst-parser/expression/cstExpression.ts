@@ -1,8 +1,7 @@
-import type { CstConstraintScope } from "../../cst-parse/constraint/CstConstraintScope.ts";
-import { peek, peekNode } from "../../cst-parse/inlineNode.ts";
-import { code, endOfCode } from "../../cst-parse/intrinsics.ts";
-import { unexpectedTokenError } from "../../cst-parse/parseError.ts";
-import { nullableParser, parser } from "../../cst-parse/parser.ts";
+import type { CstConstraintScope } from "../../../lib/cst-parse/constraint/CstConstraintScope.ts";
+import { code } from "../../../lib/cst-code/intrinsics.ts";
+import { unexpectedTokenError } from "../../../lib/cst-parse/parseError.ts";
+import { nullableParser, parser } from "../../../lib/cst-parse/parser.ts";
 import { CstExpression } from "../../cst/expression/CstExpression.ts";
 import {
   CstBinaryOperation,
@@ -16,7 +15,7 @@ import {
   OperatorPrecedence,
 } from "../../cst/expression/CstOperator.ts";
 import { Tokens } from "../../token/Tokens.ts";
-import { fmt } from "../../utils/format.ts";
+import { fmt } from "../../../lib/utils/format.ts";
 import { cstCall, cstGetCall, cstLambdaCall, cstSimpleCall } from "./cstCall.ts";
 import { cstGroup } from "./cstGroup.ts";
 import { cstLambdaExpression } from "./cstLambdaExpression.ts";
@@ -54,7 +53,7 @@ import { cstReference } from "./cstReference.ts";
 const cstExpression = parser(CstExpression, (scope: CstConstraintScope) => {
   const stack = new ExpressionStack();
 
-  scope.repeat(() => );
+  scope.repeat(() => 1);
 });
 
 type Item = CstExpression | CstOperator;

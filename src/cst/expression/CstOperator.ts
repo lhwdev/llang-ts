@@ -1,7 +1,7 @@
-import type { Token } from "../../token/Token.ts";
-import type { TokenKind } from "../../token/TokenKind.ts";
+import type { Token } from "../../../lib/token/Token.ts";
+import type { TokenKind } from "../../../lib/token/TokenKind.ts";
 import { Tokens } from "../../token/Tokens.ts";
-import { CstNode } from "../CstNode.ts";
+import { CstNode } from "../../../lib/cst/CstNode.ts";
 
 export enum OperatorPrecedence {
   // from lowest to highest

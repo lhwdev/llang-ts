@@ -1,6 +1,7 @@
-import { CstMutableList } from "../cst-parse/CstMutableList.ts";
-import { code, codeScopes, useImplicitNode } from "../cst-parse/intrinsics.ts";
-import { nullableParser, parser } from "../cst-parse/parser.ts";
+import { CstMutableList } from "../../lib/cst-parse/CstMutableList.ts";
+import { useImplicitNode } from "../../lib/cst-parse/intrinsics.ts";
+import { code } from "../../lib/cst-code/intrinsics.ts";
+import { nullableParser, parser } from "../../lib/cst-parse/parser.ts";
 import {
   CstBlockComment,
   CstImplicit,
@@ -8,9 +9,10 @@ import {
   CstLineBreak,
   CstLineComment,
   CstWhitespace,
-} from "../cst/CstImplicit.ts";
-import type { Token } from "../token/Token.ts";
-import { Tokens } from "../token/Tokens.ts";
+} from "../../lib/cst/CstImplicit.ts";
+import type { Token } from "../../lib/token/Token.ts";
+import { Tokens } from "../../src/token/Tokens.ts";
+import { codeScopes } from "../tokenizer/index.ts";
 
 export const cstWhitespace = parser(CstWhitespace, () => {
   const token = code((c) => c.expect(Tokens.Whitespace));

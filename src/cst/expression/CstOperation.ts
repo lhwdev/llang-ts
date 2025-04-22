@@ -35,6 +35,6 @@ export class CstUnaryOperation extends CstOperation {
   }
 
   override get operand(): [CstExpression] {
-    return new [this.expr]();
+    return [this.expr];
   }
 }

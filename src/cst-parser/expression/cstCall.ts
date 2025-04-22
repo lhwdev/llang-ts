@@ -1,4 +1,4 @@
-import { parser } from "../../cst-parse/parser.ts";
+import { parser } from "../../../lib/cst-parse/parser.ts";
 import { CstCall, CstGetCall, CstLambdaCall, CstSimpleCall } from "../../cst/expression/CstCall.ts";
 import type { CstExpression } from "../../cst/expression/CstExpression.ts";
 

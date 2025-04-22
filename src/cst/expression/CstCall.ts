@@ -1,10 +1,10 @@
-import type { Token } from "../../token/Token.ts";
+import type { Token } from "../../../lib/token/Token.ts";
 import type { Tokens } from "../../token/Tokens.ts";
-import { CstNode } from "../CstNode.ts";
+import { CstNode } from "../../../lib/cst/CstNode.ts";
 import type { CstTypeArguments } from "../type/CstTypeArguments.ts";
 import { CstExpression } from "./CstExpression.ts";
 import type { CstLambdaExpression } from "./CstFunctionExpression.ts";
-import type { CstList } from "../CstList.ts";
+import type { CstList } from "../../../lib/cst/CstList.ts";
 
 export class CstCall extends CstExpression {
   declare private $call: void;

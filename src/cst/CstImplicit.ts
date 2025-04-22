@@ -1,9 +1,9 @@
-import type { Token } from "../token/Token.ts";
-import { Tokens } from "../token/Tokens.ts";
-import { dumpNodeEntry, formatNodeName } from "../utils/debug.ts";
-import { fmt, format } from "../utils/format.ts";
-import type { CstList } from "./CstList.ts";
-import { CstNode } from "./CstNode.ts";
+import type { Token } from "../../lib/token/Token.ts";
+import { Tokens } from "../../src/token/Tokens.ts";
+import { dumpNodeEntry, formatNodeName } from "../../lib/utils/debug.ts";
+import { fmt, format } from "../../lib/utils/format.ts";
+import type { CstList } from "../../lib/cst/CstList.ts";
+import { CstNode } from "../../lib/cst/CstNode.ts";
 
 export class CstImplicit extends CstNode {
   declare private $implicit: void;

@@ -1,6 +1,6 @@
-import type { Token } from "../../token/Token.ts";
-import { Tokens } from "../../token/Tokens.ts";
-import type { CstList } from "../CstList.ts";
+import type { Token } from "../../../lib/token/Token.ts";
+import { Tokens } from "../../../src/token/Tokens.ts";
+import type { CstList } from "../../../lib/cst/CstList.ts";
 import { CstExpression } from "./CstExpression.ts";
 
 export abstract class CstLiteral extends CstExpression {

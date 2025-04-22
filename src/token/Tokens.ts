@@ -1,6 +1,6 @@
-import { TokenKind } from "./TokenKind.ts";
-import type { TypeMarker } from "../utils/TypeMarker.ts";
-import { type FirstToUppercase, firstToUppercase } from "../utils/strings.ts";
+import { TokenKind } from "../../lib/token/TokenKind.ts";
+import type { TypeMarker } from "../../lib/utils/TypeMarker.ts";
+import { type FirstToUppercase, firstToUppercase } from "../../lib/utils/strings.ts";
 
 export namespace Tokens {
   /**

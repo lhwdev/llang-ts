@@ -1,5 +1,5 @@
 import type { CstBody } from "../declaration/CstBody.ts";
-import type { CstModifiers } from "../declaration/CstModifier.ts";
+import type { CstModifiers } from "..//declaration/CstModifier.ts";
 import type { CstTypeParameters } from "../declaration/CstTypeParameter.ts";
 import type { CstValueParameters } from "../declaration/CstValueParameter.ts";
 import { CstExpression } from "./CstExpression.ts";
