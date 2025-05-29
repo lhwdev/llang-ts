@@ -1,21 +1,21 @@
 import type { CstNode } from "../cst/CstNode.ts";
 import type { Spanned } from "../token/Spanned.ts";
-import { EmptySlot } from "./impl_old/CstIntermediateGroup.ts";
 import { currentGroup } from "./intermediate/currentGroup.ts";
 import type { CstContextLocal, CstContextLocalKey } from "./intermediate/CstContextLocal.ts";
+import { CstIntermediateGroup } from "./intermediate/CstIntermediateGroup.ts";
 
 export function memoize<T>(calculate: () => T, dependencies?: unknown[]): T {
   const current = currentGroup();
   if (dependencies) {
     const previous = current.nextSlot();
-    if (previous === EmptySlot) return current.updateSlot(calculate());
+    if (previous === CstIntermediateGroup.EmptySlot) return current.updateSlot(calculate());
     if (!(previous instanceof MemoizedValue)) throw new Error("whoa");
 
     if (shallowArrayEquals(dependencies, previous.dependencies)) return previous.value as T;
     return current.updateSlot(new MemoizedValue(calculate(), dependencies)).value as T;
   } else {
     const previous = current.nextSlot();
-    if (previous === EmptySlot) return current.updateSlot(calculate());
+    if (previous === CstIntermediateGroup.EmptySlot) return current.updateSlot(calculate());
     return previous as T;
   }
 }
@@ -30,20 +30,17 @@ export namespace intrinsics {
   }
 
   export function debugName(name: string) {
-    currentGroup().hintType(new NodeHints.DebugName(name));
+    currentGroup().intrinsics.debugHint("name", name);
   }
 
   export function debugNodeName(name: string) {
-    currentGroup().hintType(new NodeHints.DebugNodeName(name));
-  }
-
-  export function hintSelf(hint: NodeHint<any>) {
-    currentGroup().hintType(hint);
+    currentGroup().intrinsics.debugHint("nodeName", name);
   }
 }
 
 export function insertNode<Node extends CstNode>(node: Node): Node {
-  return currentGroup().intrinsics.insertChild(node);
+  const self = currentGroup();
+  return self.intrinsics.insertChild(self, node);
 }
 
 export function provideContext(value: CstContextLocal<any>): void {

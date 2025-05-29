@@ -15,7 +15,3 @@ export type CstConstraintNodeInfo<
 export class CstConstraintNodeProps {
   declare private $CstConstraintNodeProps: void;
 }
-
-/// Maybe
-
-/// Repeat

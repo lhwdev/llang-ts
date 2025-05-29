@@ -1,3 +1,4 @@
+import type { CstNodeType } from "../cst-parse/intermediate/CstNodeType.ts";
 import type { Span } from "../token/Span.ts";
 import { GetSpanSymbol, type Spanned } from "../token/Spanned.ts";
 import { Token } from "../token/Token.ts";
@@ -7,14 +8,15 @@ import type { CstNodeInfo } from "./CstNodeInfo.ts";
 
 export type CstTreeItem = CstTree | Token;
 
-export abstract class CstTree<out Node extends CstNode = CstNode> implements Spanned {
+export abstract class CstTree<
+  out Node extends CstNode = CstNode,
+  Info extends CstNodeInfo<Node> = CstNodeInfo<Node>,
+> implements Spanned {
   abstract node: Node;
-  abstract readonly info: CstNodeInfo<Node>;
+  abstract readonly type: CstNodeType<Info>;
+  abstract readonly info: Info;
 
-  abstract readonly source: CstTree<Node>;
-
-  abstract readonly isRead: boolean;
-  abstract readonly isAttached: boolean;
+  abstract readonly source: CstTree<Node, Info>;
 
   abstract readonly items: readonly CstTreeItem[];
   abstract readonly children: readonly CstTree[];

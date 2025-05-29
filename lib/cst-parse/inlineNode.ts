@@ -1,12 +1,13 @@
 import type { CstNode } from "../cst/CstNode.ts";
 import { CstPeekNode } from "./CstSpecialNode.ts";
 import type { CstNodeInfo } from "../cst/CstNodeInfo.ts";
-import { CstParserSymbol } from "./parser.ts";
 import {
   currentGroup,
   intrinsicBeginGroup,
   intrinsicEndGroup,
 } from "./intermediate/currentGroup.ts";
+
+export const CstParserSymbol = Symbol("CstParserSymbol");
 
 /// NOTE: if you update code of node() or nullableNode(), you should also modify parser.ts.
 
@@ -19,7 +20,7 @@ export function node<Node extends CstNode>(
   intrinsicBeginGroup(child);
   try {
     const skip = child.skipCurrent();
-    if (skip) return skip as Node;
+    if (skip) return skip;
 
     const node = fn();
     return child.end(node);
@@ -38,12 +39,13 @@ export function nullableNode<Node extends CstNode>(
   fn: () => Node | null,
 ): Node | null {
   const parent = currentGroup();
-  const child = parent.intrinsics.withNullableChild().beginChild(info);
+  const child = parent.beginChild(info);
   intrinsicBeginGroup(child);
   try {
     const skip = child.skipCurrent();
-    if (skip) return skip as Node;
+    if (skip) return skip;
 
+    child.intrinsics.markNullable();
     const node = fn();
     if (node) {
       return child.end(node);
@@ -65,15 +67,17 @@ export function discardableNode<Node extends CstNode>(
   fn: () => Node,
 ): Node | null {
   const parent = currentGroup();
-  const child = parent.intrinsics.withDiscardableChild().beginChild(info);
+  const child = parent.beginChild(info);
   intrinsicBeginGroup(child);
   try {
     const skip = child.skipCurrent();
-    if (skip) return skip as Node;
+    if (skip) return skip;
 
+    child.intrinsics.markDiscardable();
     const node = fn();
     return child.end(node);
   } catch (e) {
+    // TODO: throw special error, so that two IG have same CstErrorResult
     const result = child.endWithError(e);
     if (!result) throw e;
     return result;

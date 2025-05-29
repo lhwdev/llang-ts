@@ -1,17 +1,14 @@
 import type { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
 import type { CstTree } from "../../cst/CstTree.ts";
-import type { CstProvidableContextLocalMap } from "../intermediate/CstContextLocal.ts";
 import type { CstParseIntrinsics } from "../intermediate/CstParseIntrinsics.ts";
 import type { CstSpecialNodeInfo } from "../CstSpecialNode.ts";
-import type {
-  CstIntermediateGroup,
-  CstIntermediateItem,
-} from "../intermediate/CstIntermediateGroup.ts";
+import type { CstIntermediateGroup } from "../intermediate/CstIntermediateGroup.ts";
 import type { CstIntermediateState } from "./CstIntermediateState.ts";
 import type { CstIntermediateMetadata } from "./CstIntermediateMetadata.ts";
-import type { CstIntermediateType } from "./CstIntermediateType.ts";
 import { CstIntermediateGroupBase } from "./CstIntermediateGroupBase.ts";
+import type { CstIntermediateType } from "./CstIntermediateType.ts";
+import type { CstIntermediateDebugImpl } from "./CstIntermediateDebugImpl.ts";
 
 export class CstIntermediateGroupImpl<
   out Node extends CstNode,
@@ -19,7 +16,7 @@ export class CstIntermediateGroupImpl<
 > extends CstIntermediateGroupBase<Node, Info> {
   constructor(
     override readonly meta: CstIntermediateMetadata<Info>,
-    override readonly state: CstIntermediateState<Node>,
+    override readonly state: CstIntermediateState<Node, Info>,
     override readonly intrinsics: CstParseIntrinsics<Info>, // TODO: better location?
   ) {
     super();
@@ -27,28 +24,16 @@ export class CstIntermediateGroupImpl<
 
   ///// Implementations
 
-  override get parent(): CstIntermediateGroup<any> {
-    return this.meta.parent;
-  }
-
   override get type(): CstIntermediateType<Info> {
     return this.meta.type;
   }
 
-  override get info(): Info {
-    return this.meta.info;
-  }
-
-  override get contextMap(): CstProvidableContextLocalMap {
-    return this.meta.contextMap;
-  }
-
-  override get items(): readonly CstIntermediateItem[] {
-    return this.state.items.get();
-  }
-
-  override get currentOffset(): number {
+  override get offset(): number {
     return this.state.offset;
+  }
+
+  override hintIsCurrent(isCurrent: boolean, isBegin: boolean): void {
+    this.state.hintIsCurrent(isCurrent, isBegin);
   }
 
   /// Slots
@@ -63,35 +48,39 @@ export class CstIntermediateGroupImpl<
 
   /// Building
 
-  override beginChild<Info extends CstNodeInfo<any>>(
-    info: Info,
-  ): CstIntermediateGroup<InstanceType<Info>, Info> {
-    return this.state.items.beginChild(this, info);
+  override beginChild<ChildInfo extends CstNodeInfo<any>>(
+    info: ChildInfo,
+  ): CstIntermediateGroup<InstanceType<ChildInfo>, ChildInfo> {
+    return this.state.beginChild(this, info);
   }
 
-  override beginSpecialChild<Info extends CstSpecialNodeInfo<any>>(
-    info: Info,
-  ): CstIntermediateGroup<InstanceType<Info>, Info> {
-    return this.state.items.beginSpecialChild(this, info);
+  override beginSpecialChild<ChildInfo extends CstSpecialNodeInfo<any>>(
+    info: ChildInfo,
+  ): CstIntermediateGroup<InstanceType<ChildInfo>, ChildInfo> {
+    return this.state.beginSpecialChild(this, info);
   }
 
-  override skipCurrent(): CstNode | null {
-    return this.state.items.skipCurrent();
+  override skipCurrent(): Node | null {
+    return this.state.skipCurrent();
   }
 
   override beforeEnd(node: Node): CstTree<Node> {
-    return this.state.items.beforeEnd(node);
+    return this.state.beforeEnd(node);
   }
 
   override end(node: Node): Node {
-    return this.state.items.end(node);
+    return this.state.end(this, node);
   }
 
   override endWithError(error: unknown | null): Node | null {
-    return this.state.items.endWithError(error);
+    return this.state.endWithError(this, error);
   }
 
-  override getParentForEnd(): CstIntermediateGroup<any> {
+  override getParentForEnd(): CstIntermediateGroupBase<any> {
     return this.parent;
+  }
+
+  override get debug(): CstIntermediateDebugImpl | undefined {
+    return this.state.debug;
   }
 }

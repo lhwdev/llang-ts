@@ -9,7 +9,7 @@ import {
   CstLineBreak,
   CstLineComment,
   CstWhitespace,
-} from "../../lib/cst/CstImplicit.ts";
+} from "../cst/CstImplicit.ts";
 import type { Token } from "../../lib/token/Token.ts";
 import { Tokens } from "../../src/token/Tokens.ts";
 import { codeScopes } from "../tokenizer/index.ts";

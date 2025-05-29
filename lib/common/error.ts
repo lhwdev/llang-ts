@@ -24,7 +24,7 @@ function detailedErrorInternal<E extends Error>(
 ): E {
   const lines = dedent(str.split("\n"));
 
-  log("\x1b]1337;SetMark\x1b\\" + red("Error: ") + lines.join("\n"));
+  log("\x1b]1337;SetMark\x1b\\" + red("Error: ") + lines.join("\n") + "\n");
   return new error(lines[0], options);
 }
 

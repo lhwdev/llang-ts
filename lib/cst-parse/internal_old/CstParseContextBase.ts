@@ -1,5 +1,5 @@
 import { cstImplicitList } from "../../cst-parser/cstImplicit.ts";
-import type { CstCodeContext } from "../CstCodeContext.ts";
+import type { CstCodeContext } from "../../cst-code/CstCodeContext.ts";
 import {
   type CstNodeHintType,
   type CstParseContext,

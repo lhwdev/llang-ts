@@ -1,4 +1,4 @@
-import type { CstCodeContext } from "../cst-parse/CstCodeContext.ts";
+import type { CstCodeContext } from "./CstCodeContext.ts";
 import { CstContextLocalKey } from "../cst-parse/intermediate/CstContextLocal.ts";
 import { useContext } from "../cst-parse/intrinsics.ts";
 import type { CstCodeScope } from "./tokenizer/CstCodeScope.ts";
@@ -13,3 +13,8 @@ export abstract class CstCodeContextLocal {
 
   abstract readonly codeScopes: unknown;
 }
+
+export const CstCodeScopesLocal = new CstContextLocalKey<{
+  readonly codeScopes: unknown;
+  readonly defaultScope: CstCodeScope;
+}>("CstCodeScopesLocal");

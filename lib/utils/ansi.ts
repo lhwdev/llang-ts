@@ -1093,3 +1093,7 @@ const ANSI_PATTERN = new RegExp(
 export function stripAnsiCode(string: string): string {
   return string.replace(ANSI_PATTERN, "");
 }
+
+export function findAnsiCode(string: string) {
+  return string.matchAll(ANSI_PATTERN);
+}

@@ -1,7 +1,7 @@
 import { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
 import { isInherited } from "../../utils/extends.ts";
-import type { CstCodeContext } from "../CstCodeContext.ts";
+import type { CstCodeContext } from "../../cst-code/CstCodeContext.ts";
 import type { CstCodeScope } from "../tokenizer/CstCodeScope.ts";
 import type { CstGroup } from "./CstGroup.ts";
 import type { CstIntermediateGroup } from "./CstIntermediateGroup.ts";

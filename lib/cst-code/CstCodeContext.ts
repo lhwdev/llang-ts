@@ -1,6 +1,5 @@
 import type { Token } from "../token/Token.ts";
-import type { TokenKind } from "../token/TokenKind.ts";
-import { Tokens } from "../../src/token/Tokens.ts";
+import { TokenKind } from "../token/TokenKind.ts";
 import type { TokenKinds } from "../token/TokenKinds.ts";
 
 export abstract class CstCodeContext {
@@ -18,7 +17,7 @@ export abstract class CstCodeContext {
   abstract consume<Kind extends TokenKind>(token: Token<Kind>): Token<Kind>;
 
   end(): boolean {
-    return this.peek(Tokens.End) !== null;
+    return this.peek(TokenKind.Eof) !== null;
   }
 
   abstract snapshot(): unknown;

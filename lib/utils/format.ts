@@ -7,8 +7,6 @@ import {
   green,
   italic,
   magenta,
-  red,
-  rgb8,
   stripAnsiCode,
   yellow,
 } from "./ansi.ts";
@@ -99,6 +97,7 @@ export namespace format {
           return fmt.magenta(this.constructor.name);
         });
     } else {
+      throw "TODO";
     }
   });
 }
@@ -111,6 +110,7 @@ let Options = {
   oneLine: false,
   style: true,
   maxWidth: 100,
+  maxDepth: 5,
   handleObject: (value: object): Entry => objectToStringEntry(value),
   important: (_value: object): boolean => true,
 };
@@ -143,6 +143,10 @@ class OneLineOutput {
 
   pushFork(child: OneLineOutput) {
     this.print(child.result);
+  }
+
+  build(): string {
+    return this.result;
   }
 }
 
@@ -186,6 +190,10 @@ class MultiLineOutput {
 
   push(from: MultiLineOutput) {
     this.print(from.result);
+  }
+
+  build(): string {
+    return this.result;
   }
 }
 
@@ -358,6 +366,10 @@ class ObjectEntry extends Entry {
   }
 
   override oneLine(output: OneLineOutput) {
+    if (ObjectStack.length >= Options.maxDepth) {
+      output.print("...");
+      return;
+    }
     ObjectStack.push(this.value);
     try {
       let previous: boolean | null = false;
@@ -388,6 +400,10 @@ class ObjectEntry extends Entry {
   }
 
   override multiLine(output: MultiLineOutput): void {
+    if (ObjectStack.length >= Options.maxDepth) {
+      output.print("...");
+      return;
+    }
     ObjectStack.push(this.value);
     try {
       let isFirst = true;
@@ -441,7 +457,12 @@ class StyleEntry extends Entry {
 }
 
 export type FormatEntry = Entry;
+export const FormatEntry = Entry;
 
+interface NormalFormatFn {
+  (value: unknown): Entry;
+  (strings: TemplateStringsArray, ...args: any[]): Entry;
+}
 interface FormatFn<F extends (value: string, ...args: any) => string> {
   (
     value: Entry | (() => Entry | string) | string,
@@ -467,7 +488,7 @@ interface Fmt extends Formats {
 
   symbol(name: unknown): Entry;
   parameter(name: unknown): Entry;
-  code(content: unknown): Entry;
+  code: NormalFormatFn;
   lazy(fn: (context: FormatContext) => Entry | string): Entry;
 
   join(entries: Entry[], separator?: Entry): Entry;
@@ -479,6 +500,17 @@ function mapInput(input: Entry | unknown): Entry {
   if (input instanceof Entry) return input;
   if (typeof input === "symbol") return new ValueEntry(input.toString());
   return new ValueEntry(`${input}`);
+}
+
+function mapNormal(str: unknown, ...args: any[]) {
+  if (Array.isArray(str) && typeof str.at(0) === "string" && "raw" in str) {
+    return fmt(str as any, ...args);
+  } else {
+    return mapInput(str);
+  }
+}
+function mappedNormal(fn: (value: Entry) => Entry): NormalFormatFn {
+  return (...args) => fn(mapNormal(...args));
 }
 
 const CommonStyled = {
@@ -532,12 +564,10 @@ export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
   },
 
   parameter(name: unknown) {
-    return new ValueEntry(red(`${name}`));
+    return this.red(`${name}`);
   },
 
-  code(content: unknown) {
-    return new ValueEntry(rgb8(`${content}`, 110));
-  },
+  code: mappedNormal((entry) => fmt.rgb8(entry, 110)),
 
   lazy(fn: (context: FormatContext) => Entry | string) {
     return new LazyEntry((context) => mapInput(fn(context)));
@@ -602,6 +632,11 @@ export const fmt: Fmt = Object.assign((a?: any, ...args: any): any => {
 });
 
 function fmtTemplate(strings: TemplateStringsArray, ...args: any[]): Entry {
+  if (strings.length === 1) return new ValueEntry(strings[0]);
+  if (strings.length === 2 && strings[0] === "" && strings[1] === "") {
+    return valueToColorStringEntry(args[0]);
+  }
+
   const list = new ListEntry();
   for (let i = 0; i < strings.length; i++) {
     if (i !== 0) list.push(valueToColorStringEntry(args[i - 1]));
@@ -820,6 +855,7 @@ export function arrayToStringEntry(
   data: any[],
   mapItem?: (key: string | number, value: any, item: ListEntry) => Entry,
 ): Entry {
+  if (ObjectStack.length >= Options.maxDepth) return new ValueEntry("...");
   const result = new ObjectEntry(data);
   ObjectStack.push(data);
 
@@ -882,12 +918,12 @@ export function formatFn(options: Options | undefined | null, fn: () => Entry): 
     try {
       const output = new OneLineOutput();
       entry.oneLine(output);
-      r = output.result;
+      r = output.build();
     } catch (e) {
       if (e !== TooLongError) throw e;
       const output = new MultiLineOutput();
       entry.multiLine(output);
-      r = output.result;
+      r = output.build();
     }
     return r;
   } finally {

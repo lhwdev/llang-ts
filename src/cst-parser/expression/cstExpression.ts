@@ -43,7 +43,7 @@ import { cstReference } from "./cstReference.ts";
  * - *prefix: some(+ - !)
  * - *postfix: propagate error
  * - *postfix: invoke
- * - *binary: access
+ * - (*binary: access -> this is statement...)
  * All starred items are treated specially.
  *
  * Eager operations:

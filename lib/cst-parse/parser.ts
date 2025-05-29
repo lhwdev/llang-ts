@@ -1,7 +1,7 @@
 import { yellow } from "../utils/ansi.ts";
 import type { CstNode } from "../cst/CstNode.ts";
 import type { CstNodeInfo } from "../cst/CstNodeInfo.ts";
-import { node, nullableNode } from "./inlineNode.ts";
+import { CstParserSymbol, node, nullableNode } from "./inlineNode.ts";
 import { ParseError } from "./parseError.ts";
 import type { CstIntermediateGroup } from "./intermediate/CstIntermediateGroup.ts";
 import {
@@ -10,8 +10,6 @@ import {
   intrinsicEndGroup,
   withGroup,
 } from "./intermediate/currentGroup.ts";
-
-export const CstParserSymbol = Symbol("CstParserSymbol");
 
 abstract class CstParserClass<Node extends CstNode, Fn extends (...args: any[]) => any> {
   get [CstParserSymbol](): true {
@@ -104,7 +102,7 @@ export function parser<Params extends any[], Node extends CstNode>(
     intrinsicBeginGroup(child);
     try {
       const skip = child.skipCurrent();
-      if (skip) return skip as Node;
+      if (skip) return skip;
 
       const node = impl(...args);
       return child.end(node);
@@ -133,12 +131,13 @@ export function nullableParser<Params extends any[], Node extends CstNode>(
   rawParserInit(info, impl, options);
   const invoke = (...args: Params): Node | null => {
     const parent = currentGroup();
-    const child = parent.intrinsics.withNullableChild().beginChild(info);
+    const child = parent.beginChild(info);
     intrinsicBeginGroup(child);
     try {
       const skip = child.skipCurrent();
-      if (skip) return skip as Node;
+      if (skip) return skip;
 
+      child.intrinsics.markNullable();
       const node = impl(...args);
       if (node) {
         return child.end(node);

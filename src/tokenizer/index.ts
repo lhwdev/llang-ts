@@ -1,4 +1,4 @@
-import { CstCodeContextLocal } from "../../lib/cst-code/contextLocal.ts";
+import { CstCodeContextLocal } from "../../lib/cst-code/CstCodeContextLocal.ts";
 import { variableWrapper } from "../../lib/utils/variableWrapper.ts";
 import type { CodeScopes } from "./scopes.ts";
 

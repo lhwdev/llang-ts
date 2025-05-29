@@ -1,8 +1,8 @@
 import type { Token } from "../token/Token.ts";
 import type { TokenKind } from "../token/TokenKind.ts";
-import type { CstCodeContext } from "../cst-parse/CstCodeContext.ts";
+import type { CstCodeContext } from "./CstCodeContext.ts";
 import type { CstCodeScope } from "./tokenizer/CstCodeScope.ts";
-import { CstCodeContextLocal } from "./contextLocal.ts";
+import { CstCodeContextLocal } from "./CstCodeContextLocal.ts";
 
 // export namespace memoize {
 //   export const OnRemembered = Symbol("OnRemembered");
@@ -17,7 +17,11 @@ export function code<R>(scope: CstCodeScope | null, fn: (code: CstCodeContext) =
  */
 
 export function code<R>(a: any, b?: any): R {
-  return CstCodeContextLocal.current.code(a, b);
+  if (b) {
+    return CstCodeContextLocal.current.code(a, b);
+  } else {
+    return CstCodeContextLocal.current.code(null, a);
+  }
 }
 
 export namespace code {

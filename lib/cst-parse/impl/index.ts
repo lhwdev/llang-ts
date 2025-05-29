@@ -18,7 +18,7 @@ export function createIntermediateGroup<
       throw new Error("TODO");
     },
   };
-  const startOffset = parent.currentOffset;
+  const startOffset = parent.offset;
   const meta = new CstIntermediateMetadata(
     parent,
     info,

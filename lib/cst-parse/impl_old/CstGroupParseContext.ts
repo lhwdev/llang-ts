@@ -2,7 +2,7 @@ import type { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
 import type { CstTree } from "../../cst/CstTree.ts";
 import type { Token } from "../../token/Token.ts";
-import type { CstCodeContext } from "../CstCodeContext.ts";
+import type { CstCodeContext } from "../../cst-code/CstCodeContext.ts";
 import type {
   ContextKey,
   ContextValue,

@@ -2,7 +2,7 @@ import type { Token } from "../../token/Token.ts";
 import type { TokenKind } from "../../token/TokenKind.ts";
 import { Tokens } from "../../../src/token/Tokens.ts";
 import { isTokenKindMatch, type TokenKinds } from "../../token/TokenKinds.ts";
-import { CstCodeContext } from "../CstCodeContext.ts";
+import { CstCodeContext } from "../../cst-code/CstCodeContext.ts";
 import type { CstTokenizerContext } from "../tokenizer/CstTokenizerContext.ts";
 import type { CstCodeScope } from "../tokenizer/CstCodeScope.ts";
 

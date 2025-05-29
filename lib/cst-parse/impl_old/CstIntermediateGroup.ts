@@ -6,7 +6,7 @@ import { GetSpanSymbol, type Spanned } from "../../token/Spanned.ts";
 import type { Token } from "../../token/Token.ts";
 import { isInherited } from "../../utils/extends.ts";
 import { fmt, formatClass, FormatEntries, type FormatEntry } from "../../utils/format.ts";
-import type { CstCodeContext } from "../CstCodeContext.ts";
+import type { CstCodeContext } from "../../cst-code/CstCodeContext.ts";
 import type { CstNodeHintType, CstParseContext } from "../CstParseContext.ts";
 import { getContext, NodeHint, NodeHints, withContext } from "../CstParseContext.ts";
 import { debug, DebugFlags } from "./debug.ts";

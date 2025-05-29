@@ -1,22 +1,50 @@
-import { CstNode } from "../../cst/CstNode.ts";
+import type { CstNode } from "../../cst/CstNode.ts";
 import type { CstNodeInfo } from "../../cst/CstNodeInfo.ts";
-import type { CstIntermediateGroup } from "../intermediate/CstIntermediateGroup.ts";
+import { CstImplicitNode } from "../CstSpecialNode.ts";
 import { CstNodeType } from "../intermediate/CstNodeType.ts";
-import { CstIntermediateMetadata } from "./CstIntermediateMetadata.ts";
+import type { CstParseIntrinsics } from "../intermediate/CstParseIntrinsics.ts";
+import type { CstIntermediateGroupBase } from "./CstIntermediateGroupBase.ts";
+import type { CstIntermediateMetadata } from "./CstIntermediateMetadata.ts";
+import type { CstIntermediateState } from "./CstIntermediateState.ts";
 
-export class CstIntermediateType<out Info extends CstNodeInfo<any>> extends CstNodeType<Info> {
-  declare private _metadataFactory?;
+export abstract class CstIntermediateType<out Info extends CstNodeInfo<any>>
+  extends CstNodeType<Info> {
+  declare MetadataType: ReturnType<this["createMetadata"]>;
+  declare StateType: ReturnType<this["createIntermediateState"]>;
 
-  createMetadata(
-    parent: CstIntermediateGroup<any>,
+  handleImplicitPrefix(
+    self: CstIntermediateGroupBase<any>,
+    implicitFn: () => CstNode | null,
+    // deno-lint-ignore no-unused-vars
     info: Info,
-    startOffset: number,
-  ): CstIntermediateMetadata<Info> {
-    if (!this._metadataFactory) {
-      this._metadataFactory = CstIntermediateMetadata.defaultFactory(this);
-    }
-    return new this._metadataFactory(parent, info, startOffset);
+  ): CstImplicitNode | null {
+    return self.beginSpecialChild(CstImplicitNode).buildNullableNode(() => {
+      const result = implicitFn();
+      return result ? new CstImplicitNode(result) : null;
+    });
   }
 
-  static Default = new CstIntermediateType<typeof CstNode>(CstNode);
+  get isExplicit(): boolean {
+    return true;
+  }
+
+  get isRestorable(): boolean {
+    return false;
+  }
+
+  abstract createMetadata(
+    parent: CstIntermediateGroupBase<any>,
+    info: Info,
+  ): CstIntermediateMetadata<Info>;
+
+  abstract createIntermediateState(
+    meta: this["MetadataType"],
+    parentState: CstIntermediateState<any>,
+  ): CstIntermediateState<InstanceType<Info>, Info>;
+
+  abstract createIntrinsics(
+    info: Info,
+    meta: this["MetadataType"],
+    state: this["StateType"],
+  ): CstParseIntrinsics<Info>;
 }

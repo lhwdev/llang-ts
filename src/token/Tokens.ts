@@ -7,10 +7,7 @@ export namespace Tokens {
    * End: end of scope. In root scope, represents EOF(end of file). In specific
    * scope, represents delimited scope, such as end of group or comma.
    */
-  class _End extends TokenKind {
-    declare private $eof: void;
-  }
-  export const End = new _End("");
+  export const End = new TokenKind.Eof();
 
   /// Implicit Nodes (ignored)
   export class Implicit extends TokenKind {

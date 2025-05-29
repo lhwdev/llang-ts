@@ -26,3 +26,11 @@ export abstract class TokenKind {
     return `${tokenKindName(this)}(code='${this.code}')`;
   }
 }
+
+export namespace TokenKind {
+  export class Eof extends TokenKind {
+    constructor() {
+      super("");
+    }
+  }
+}
